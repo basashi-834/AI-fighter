@@ -11,7 +11,7 @@
 ```
 npm install
 npm run dev      # http://127.0.0.1:5173/ で起動
-npm test         # 96 件のテスト（フレームデータの実測検証を含む）
+npm test         # 99 件のテスト（フレームデータの実測検証を含む）
 npm run build    # dist/ に出力
 ```
 
@@ -207,7 +207,7 @@ src/
   net/        オンライン対戦（ロールバックと WebRTC）
   game/       画面遷移とメインループ
   audio/      効果音と音楽の合成
-tests/        96 件のテスト
+tests/        99 件のテスト
 docs/         中身のしくみの解説
 ```
 
