@@ -1,0 +1,397 @@
+/**
+ * 試合以外の画面（タイトル・キャラクター選択・設定など）。
+ */
+
+import { ROSTER } from '../data';
+import { FLOOR_SCREEN_Y, VIEW_H, VIEW_W, px } from '../engine/constants';
+import { createFighter, type Fighter } from '../engine/fighter';
+import type { MatchState } from '../engine/match';
+import type { CharacterDef } from '../engine/types';
+import { drawFighter } from '../render/fighterArt';
+import { bigText } from '../render/renderer';
+import type { StageDef } from '../render/stage';
+import { STAGES, drawStage } from '../render/stage';
+import type { Settings, SelectState } from './app';
+
+/** 画面に立たせるだけの、飾り用ファイター。 */
+function dummyFighter(charIndex: number, side: number, x: number, state: Fighter['state'] = 'idle'): Fighter {
+  const f = createFighter(charIndex, side, ROSTER[charIndex], px(x));
+  f.facingRight = side === 0;
+  f.state = state;
+  return f;
+}
+
+function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, alpha = 0.66): void {
+  ctx.fillStyle = `rgba(6,8,18,${alpha})`;
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawTitle(
+  ctx: CanvasRenderingContext2D,
+  tick: number,
+  items: { id: string; label: string; sub: string }[],
+  index: number,
+): void {
+  drawStage(ctx, STAGES[0], Math.sin(tick * 0.004) * 60, tick);
+  ctx.fillStyle = 'rgba(4,4,12,0.55)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  // 背後に 2 人立たせる。
+  const a = dummyFighter(0, 0, -110);
+  const b = dummyFighter(1, 1, 110);
+  drawFighter(ctx, a, ROSTER[0], 0, VIEW_W, tick, { alpha: 0.5 });
+  drawFighter(ctx, b, ROSTER[1], 0, VIEW_W, tick, { alpha: 0.5 });
+  ctx.fillStyle = 'rgba(4,4,12,0.35)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  ctx.textAlign = 'center';
+  const bob = Math.sin(tick * 0.05) * 2;
+  bigText(ctx, 'AI FIGHTER', VIEW_W / 2, 62 + bob, 44, '#ffd94a', '#7a1020');
+  ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#e8e8f0';
+  ctx.fillText('２Ｄ 対戦格闘ゲーム', VIEW_W / 2, 80 + bob);
+
+  const top = 108;
+  for (let i = 0; i < items.length; i++) {
+    const y = top + i * 24;
+    const on = i === index;
+    if (on) {
+      ctx.fillStyle = 'rgba(255,217,74,0.16)';
+      ctx.fillRect(VIEW_W / 2 - 118, y - 13, 236, 21);
+      ctx.fillStyle = '#ffd94a';
+      ctx.font = 'bold 12px "Noto Sans JP", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('▶', VIEW_W / 2 - 100, y + 2);
+    }
+    ctx.textAlign = 'left';
+    ctx.font = `bold ${on ? 15 : 13}px "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = on ? '#ffffff' : 'rgba(230,230,240,0.65)';
+    ctx.fillText(items[i].label, VIEW_W / 2 - 92, y + 3);
+    ctx.font = '9px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = on ? 'rgba(255,217,74,0.9)' : 'rgba(200,200,220,0.35)';
+    ctx.textAlign = 'right';
+    ctx.fillText(items[i].sub, VIEW_W / 2 + 108, y + 2);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('W / S で選択、Enter か U で決定', VIEW_W / 2, VIEW_H - 14);
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawCharSelect(
+  ctx: CanvasRenderingContext2D,
+  select: SelectState,
+  vsMode: string,
+  tick: number,
+): void {
+  ctx.fillStyle = '#0b0d1c';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // 背景の斜め線。
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.strokeStyle = '#4a5fa8';
+  for (let i = -10; i < 40; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * 20 + (tick % 20), 0);
+    ctx.lineTo(i * 20 - 60 + (tick % 20), VIEW_H);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+  bigText(ctx, 'キャラクター選択', VIEW_W / 2, 26, 18, '#ffffff', '#22264a');
+
+  // 中央にカード。
+  const cardW = 82;
+  const gap = 10;
+  const totalW = ROSTER.length * cardW + (ROSTER.length - 1) * gap;
+  const startX = (VIEW_W - totalW) / 2;
+
+  for (let i = 0; i < ROSTER.length; i++) {
+    const c = ROSTER[i];
+    const x = startX + i * (cardW + gap);
+    const y = 46;
+    const p1 = select.cursor[0] === i;
+    const p2 = select.cursor[1] === i;
+    ctx.fillStyle = '#161a2e';
+    ctx.fillRect(x, y, cardW, 96);
+    // キャラの立ち絵。
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, cardW, 96);
+    ctx.clip();
+    const f = dummyFighter(i, 0, 0);
+    ctx.translate(x + cardW / 2 - VIEW_W / 2, y + 96 - FLOOR_SCREEN_Y - 2);
+    drawFighter(ctx, f, c, 0, VIEW_W, tick);
+    ctx.restore();
+
+    ctx.strokeStyle = p1 && p2 ? '#ffd94a' : p1 ? '#ff6b6b' : p2 ? '#6bb8ff' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = p1 || p2 ? 2 : 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, cardW - 1, 96 - 1);
+
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(c.nameJa, x + cardW / 2, y + 110);
+    ctx.font = '8px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText(c.name.toUpperCase(), x + cardW / 2, y + 120);
+  }
+
+  // 選ばれているキャラの説明。
+  const c1 = ROSTER[select.cursor[0]];
+  panel(ctx, 14, 176, 214, 58);
+  drawCharInfo(ctx, c1, 20, 188, '#ff6b6b', 'P1', select.locked[0]);
+  const c2 = ROSTER[select.cursor[1]];
+  panel(ctx, VIEW_W - 228, 176, 214, 58);
+  drawCharInfo(ctx, c2, VIEW_W - 222, 188, '#6bb8ff', vsMode === 'local' ? 'P2' : 'CPU', select.locked[1]);
+
+  ctx.textAlign = 'center';
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(
+    `ステージ: ${STAGES[select.stage].nameJa}  （Q / E で変更）`,
+    VIEW_W / 2,
+    VIEW_H - 22,
+  );
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('P1: A / D で選択、U で決定   P2: ← → で選択、T で決定', VIEW_W / 2, VIEW_H - 9);
+}
+
+function drawCharInfo(
+  ctx: CanvasRenderingContext2D,
+  c: CharacterDef,
+  x: number,
+  y: number,
+  color: string,
+  tag: string,
+  locked: boolean,
+): void {
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 9px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = color;
+  ctx.fillText(tag, x, y);
+  ctx.font = 'bold 13px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = locked ? '#ffd94a' : '#ffffff';
+  ctx.fillText(c.nameJa, x + 22, y + 1);
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText(c.tagline, x, y + 15);
+
+  // 能力の目安。
+  const stats: [string, number][] = [
+    ['体力', c.health / 1200],
+    ['速さ', c.walkForward / px(2.2)],
+    ['威力', c.moves.reduce((a, m) => Math.max(a, m.hit.damage), 0) / 360],
+  ];
+  stats.forEach(([label, v], i) => {
+    const by = y + 26 + i * 8;
+    ctx.font = '8px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText(label, x, by + 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(x + 26, by - 3, 80, 5);
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 26, by - 3, 80 * Math.max(0.08, Math.min(1, v)), 5);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawVersus(
+  ctx: CanvasRenderingContext2D,
+  chars: [CharacterDef, CharacterDef],
+  tick: number,
+  stage: StageDef,
+): void {
+  drawStage(ctx, stage, 0, tick);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  const slide = Math.min(1, tick % 200 / 20);
+  void slide;
+  const a = dummyFighter(ROSTER.indexOf(chars[0]), 0, -120, 'intro');
+  const b = dummyFighter(ROSTER.indexOf(chars[1]), 1, 120, 'intro');
+  drawFighter(ctx, a, chars[0], 0, VIEW_W, tick);
+  drawFighter(ctx, b, chars[1], 0, VIEW_W, tick);
+
+  ctx.textAlign = 'center';
+  bigText(ctx, 'VS', VIEW_W / 2, 116, 48, '#ffd94a', '#7a1020');
+  ctx.font = 'bold 15px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.fillText(chars[0].nameJa, 24, 40);
+  ctx.textAlign = 'right';
+  ctx.fillText(chars[1].nameJa, VIEW_W - 24, 40);
+  ctx.textAlign = 'center';
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(stage.nameJa, VIEW_W / 2, VIEW_H - 16);
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawResult(
+  ctx: CanvasRenderingContext2D,
+  s: MatchState,
+  chars: [CharacterDef, CharacterDef],
+  tick: number,
+): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  const w = s.matchWinner;
+  ctx.textAlign = 'center';
+  if (w >= 0) {
+    bigText(ctx, `${chars[w].nameJa} WIN`, VIEW_W / 2, 100, 30, '#ffd94a', '#7a1020');
+  } else {
+    bigText(ctx, 'DRAW', VIEW_W / 2, 100, 30, '#dddddd', '#333333');
+  }
+  ctx.font = 'bold 13px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`${s.wins[0]} - ${s.wins[1]}`, VIEW_W / 2, 126);
+
+  const alpha = 0.5 + Math.sin(tick * 0.1) * 0.4;
+  ctx.globalAlpha = alpha;
+  ctx.font = '10px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('Enter でキャラクター選択へ / Esc でタイトルへ', VIEW_W / 2, VIEW_H - 26);
+  ctx.globalAlpha = 1;
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawPause(ctx: CanvasRenderingContext2D, index: number): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.textAlign = 'center';
+  bigText(ctx, 'PAUSE', VIEW_W / 2, 82, 26, '#ffffff', '#222');
+  const items = ['続ける', '仕切り直し', 'キャラクター選択', 'タイトルへ'];
+  items.forEach((label, i) => {
+    const y = 116 + i * 22;
+    const on = i === index;
+    ctx.font = `bold ${on ? 14 : 12}px "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = on ? '#ffd94a' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(label, VIEW_W / 2, y);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawTrainingPanel(
+  ctx: CanvasRenderingContext2D,
+  s: MatchState,
+  chars: [CharacterDef, CharacterDef],
+): void {
+  const labels: Record<string, string> = {
+    stand: '立ち',
+    crouch: 'しゃがみ',
+    jump: 'ジャンプ',
+    guard: 'ガード（当たる瞬間だけ）',
+    guardAll: 'ガードしっぱなし',
+    cpu: 'CPU',
+  };
+  panel(ctx, VIEW_W - 168, 60, 156, 62, 0.55);
+  ctx.textAlign = 'left';
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#9ff0a0';
+  ctx.fillText(`F1 判定表示  F4 位置リセット`, VIEW_W - 162, 72);
+  ctx.fillText(`F2 相手の行動: ${labels[s.config.dummyAction]}`, VIEW_W - 162, 84);
+  ctx.fillText(`F3 自動回復: ${s.config.autoRecover ? 'ON' : 'OFF'}`, VIEW_W - 162, 96);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(`${chars[0].nameJa} vs ${chars[1].nameJa}`, VIEW_W - 162, 112);
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawHowTo(ctx: CanvasRenderingContext2D, tick: number): void {
+  ctx.fillStyle = '#0a0c1a';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.textAlign = 'center';
+  bigText(ctx, '操作説明', VIEW_W / 2, 26, 18, '#ffffff', '#22264a');
+
+  const rows: [string, string][] = [
+    ['移動', 'A / D（1P）　← → （2P）'],
+    ['しゃがみ・ガード', 'S でしゃがみ、後ろを入れるとガード'],
+    ['ジャンプ', 'W（前後に入れながらで前後ジャンプ）'],
+    ['パンチ', 'U 弱 / I 中 / O 強'],
+    ['キック', 'J 弱 / K 中 / L 強'],
+    ['投げ', '弱P + 弱K（近距離で）'],
+    ['ダッシュ', '前・前　／　バックダッシュ 後ろ・後ろ'],
+    ['必殺技', '236 + P（波動）、623 + P（昇龍）、214 + K'],
+    ['EX 必殺技', '同じコマンド + パンチ 2 つ（ゲージ 0.5 本）'],
+    ['超必殺技', '236236 + P（ゲージ 1 本）'],
+    ['判定表示', 'F1（トレーニング中）'],
+  ];
+  ctx.textAlign = 'left';
+  rows.forEach(([k, v], i) => {
+    const y = 50 + i * 17;
+    ctx.font = 'bold 10px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = '#ffd94a';
+    ctx.fillText(k, 40, y);
+    ctx.font = '10px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(v, 150, y);
+  });
+
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 0.5 + Math.sin(tick * 0.1) * 0.4;
+  ctx.font = '10px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('Enter / Esc で戻る', VIEW_W / 2, VIEW_H - 14);
+  ctx.globalAlpha = 1;
+}
+
+/* ------------------------------------------------------------------ */
+
+export function drawOptions(ctx: CanvasRenderingContext2D, s: Settings, index: number): void {
+  ctx.fillStyle = '#0a0c1a';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.textAlign = 'center';
+  bigText(ctx, '設定', VIEW_W / 2, 30, 18, '#ffffff', '#22264a');
+
+  const diffLabel: Record<string, string> = {
+    easy: 'やさしい',
+    normal: 'ふつう',
+    hard: 'つよい',
+    expert: '鬼',
+  };
+  const rows: [string, string][] = [
+    ['CPU の強さ', diffLabel[s.difficulty]],
+    ['先取ラウンド数', `${s.rounds}`],
+    ['制限時間', s.timeLimit === 0 ? 'なし' : `${Math.round(s.timeLimit / 60)} 秒`],
+    ['全体の音量', `${Math.round(s.master * 100)}%`],
+    ['音楽の音量', `${Math.round(s.music * 100)}%`],
+    ['効果音の音量', `${Math.round(s.sfx * 100)}%`],
+    ['当たり判定の表示', s.showBoxes ? 'ON' : 'OFF'],
+  ];
+  rows.forEach(([k, v], i) => {
+    const y = 62 + i * 22;
+    const on = i === index;
+    if (on) {
+      ctx.fillStyle = 'rgba(255,217,74,0.14)';
+      ctx.fillRect(70, y - 13, VIEW_W - 140, 20);
+    }
+    ctx.textAlign = 'left';
+    ctx.font = `bold ${on ? 12 : 11}px "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = on ? '#ffffff' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(k, 82, y + 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = on ? '#ffd94a' : 'rgba(255,255,255,0.5)';
+    ctx.fillText(on ? `◀ ${v} ▶` : v, VIEW_W - 82, y + 2);
+  });
+
+  ctx.textAlign = 'center';
+  ctx.font = '9px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('W / S で項目、A / D で変更、Enter で戻る', VIEW_W / 2, VIEH_BOTTOM);
+}
+
+const VIEH_BOTTOM = VIEW_H - 14;

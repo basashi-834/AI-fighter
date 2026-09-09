@@ -1,0 +1,117 @@
+:root {
+  color-scheme: dark;
+  --bg: #05060d;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #e8e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+#frame {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 40%, #16182c 0%, #05060d 70%);
+}
+
+#screen {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  box-shadow: 0 0 0 2px #23263f, 0 18px 60px rgba(0, 0, 0, 0.75);
+  background: #000;
+}
+
+/* 起動時の案内（音を鳴らす許可を得るため、最初に 1 回操作してもらう） */
+#boot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 5, 12, 0.92);
+  z-index: 20;
+  cursor: pointer;
+  transition: opacity 0.35s ease;
+}
+
+#boot.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-inner { text-align: center; }
+
+.boot-inner h1 {
+  font-size: clamp(32px, 7vw, 68px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin: 0 0 12px;
+  color: #ffd94a;
+  text-shadow: 0 3px 0 #7a1020, 0 0 26px rgba(255, 217, 74, 0.35);
+}
+
+.boot-inner p { margin: 6px 0; font-size: 14px; opacity: 0.85; }
+.boot-inner .small { font-size: 11px; opacity: 0.5; }
+
+/* オンライン対戦のコード交換 */
+.net-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 5, 12, 0.86);
+  z-index: 30;
+}
+
+.net-card {
+  width: min(560px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+  background: #11142a;
+  border: 1px solid #2c3157;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.net-card h2 { margin: 0 0 10px; font-size: 17px; color: #ffd94a; }
+.net-card label { display: block; font-size: 11px; opacity: 0.75; margin: 10px 0 4px; }
+.net-card textarea {
+  width: 100%;
+  height: 84px;
+  resize: vertical;
+  background: #080a18;
+  color: #cfe4ff;
+  border: 1px solid #2c3157;
+  border-radius: 6px;
+  padding: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+.net-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.net-card button {
+  background: #23294d;
+  color: #e8e8f0;
+  border: 1px solid #39406e;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.net-card button:hover { background: #2e355e; }
+.net-card .net-go { background: #b8892a; border-color: #d8a94a; color: #1a1200; font-weight: 700; }
+.net-card .net-hint { font-size: 10px; opacity: 0.5; margin-top: 12px; }
