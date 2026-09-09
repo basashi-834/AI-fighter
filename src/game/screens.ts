@@ -3,7 +3,7 @@
  */
 
 import { ROSTER } from '../data';
-import { FLOOR_SCREEN_Y, VIEW_H, VIEW_W, px } from '../engine/constants';
+import { FLOOR_SCREEN_Y, VIEW_H, VIEW_W, px, toPx } from '../engine/constants';
 import { createFighter, type Fighter } from '../engine/fighter';
 import { ALL_BUTTONS, BUTTON_BITS, inputAt, toNumpad } from '../engine/input';
 import type { MatchState } from '../engine/match';
@@ -11,6 +11,7 @@ import type { CharacterDef } from '../engine/types';
 import { drawFighter } from '../render/fighterArt';
 import { bigText } from '../render/renderer';
 import type { StageDef } from '../render/stage';
+import type { Effects } from '../render/effects';
 import { STAGES, drawStage } from '../render/stage';
 import { PAUSE_ITEMS, type Settings, type SelectState } from './app';
 
@@ -32,23 +33,52 @@ function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
 
 /* ------------------------------------------------------------------ */
 
+export interface TitleDemo {
+  state: MatchState;
+  chars: [CharacterDef, CharacterDef];
+  effects: Effects;
+  stage: StageDef;
+}
+
 export function drawTitle(
   ctx: CanvasRenderingContext2D,
   tick: number,
   items: { id: string; label: string; sub: string }[],
   index: number,
+  demo: TitleDemo | null = null,
 ): void {
-  drawStage(ctx, STAGES[0], Math.sin(tick * 0.004) * 60, tick);
-  ctx.fillStyle = 'rgba(4,4,12,0.55)';
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-
-  // 背後に 2 人立たせる。
-  const a = dummyFighter(0, 0, -110);
-  const b = dummyFighter(1, 1, 110);
-  drawFighter(ctx, a, ROSTER[0], 0, VIEW_W, tick, { alpha: 0.5 });
-  drawFighter(ctx, b, ROSTER[1], 0, VIEW_W, tick, { alpha: 0.5 });
-  ctx.fillStyle = 'rgba(4,4,12,0.35)';
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  if (demo) {
+    // 裏で CPU 同士が実際に戦っている。
+    // メニューは左に置くので、試合は右半分に寄せて見せる。
+    // 試合中のカメラは画面端で止まるが、デモでは常に 2 人を追いたいので、
+    // ここでは 2 人の真ん中から直接カメラ位置を出している。
+    const mid = Math.round((toPx(demo.state.fighters[0].x) + toPx(demo.state.fighters[1].x)) / 2);
+    const cam = mid - 112;
+    drawStage(ctx, demo.stage, cam, tick);
+    ctx.globalAlpha = 0.65;
+    for (let i = 0; i < 2; i++) {
+      drawFighter(ctx, demo.state.fighters[i], demo.chars[i], cam, VIEW_W, tick);
+    }
+    demo.effects.draw(ctx, cam, VIEW_W);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(4,4,12,0.45)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    // 誰が戦っているかだけ出す。
+    ctx.textAlign = 'right';
+    ctx.font = '9px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillText(`DEMO  ${demo.chars[0].nameJa} vs ${demo.chars[1].nameJa}`, VIEW_W - 14, VIEW_H - 30);
+  } else {
+    drawStage(ctx, STAGES[0], Math.sin(tick * 0.004) * 60, tick);
+    ctx.fillStyle = 'rgba(4,4,12,0.55)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const a = dummyFighter(0, 0, -110);
+    const b = dummyFighter(1, 1, 110);
+    drawFighter(ctx, a, ROSTER[0], 0, VIEW_W, tick, { alpha: 0.5 });
+    drawFighter(ctx, b, ROSTER[1], 0, VIEW_W, tick, { alpha: 0.5 });
+    ctx.fillStyle = 'rgba(4,4,12,0.35)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
 
   ctx.textAlign = 'center';
   const bob = Math.sin(tick * 0.05) * 2;
@@ -57,39 +87,41 @@ export function drawTitle(
   ctx.fillStyle = '#e8e8f0';
   ctx.fillText('２Ｄ 対戦格闘ゲーム', VIEW_W / 2, 61 + bob);
 
+  // メニューは左に寄せる。右半分でデモ対戦が見えるようにするため。
   const top = 84;
   const step = 21;
-  // 背後のキャラクターと文字が重なって読みにくくなるので、下敷きを敷く。
-  ctx.fillStyle = 'rgba(6,8,18,0.82)';
-  ctx.fillRect(VIEW_W / 2 - 124, top - 16, 248, items.length * step + 8);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.strokeRect(VIEW_W / 2 - 123.5, top - 15.5, 247, items.length * step + 7);
+  const panelX = 16;
+  const panelW = 226;
+  ctx.fillStyle = 'rgba(6,8,18,0.8)';
+  ctx.fillRect(panelX, top - 16, panelW, items.length * step + 8);
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.strokeRect(panelX + 0.5, top - 15.5, panelW - 1, items.length * step + 7);
 
   for (let i = 0; i < items.length; i++) {
     const y = top + i * step;
     const on = i === index;
     if (on) {
       ctx.fillStyle = 'rgba(255,217,74,0.18)';
-      ctx.fillRect(VIEW_W / 2 - 120, y - 12, 240, 18);
+      ctx.fillRect(panelX + 4, y - 12, panelW - 8, 18);
       ctx.fillStyle = '#ffd94a';
       ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('▶', VIEW_W / 2 - 102, y + 1);
+      ctx.textAlign = 'left';
+      ctx.fillText('▶', panelX + 7, y + 1);
     }
     ctx.textAlign = 'left';
     ctx.font = `bold ${on ? 14 : 12}px "Noto Sans JP", sans-serif`;
-    ctx.fillStyle = on ? '#ffffff' : 'rgba(230,230,240,0.6)';
-    ctx.fillText(items[i].label, VIEW_W / 2 - 94, y + 2);
+    ctx.fillStyle = on ? '#ffffff' : 'rgba(230,230,240,0.62)';
+    ctx.fillText(items[i].label, panelX + 22, y + 2);
     ctx.font = '8px "Trebuchet MS", sans-serif';
     ctx.fillStyle = on ? 'rgba(255,217,74,0.9)' : 'rgba(200,200,220,0.3)';
     ctx.textAlign = 'right';
-    ctx.fillText(items[i].sub, VIEW_W / 2 + 110, y + 1);
+    ctx.fillText(items[i].sub, panelX + panelW - 8, y + 1);
   }
 
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.font = '9px "Noto Sans JP", sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText('W / S で選択、Enter か U で決定', VIEW_W / 2, VIEW_H - 14);
+  ctx.fillText('W / S で選択、Enter か U で決定', panelX + 3, VIEW_H - 14);
 }
 
 /* ------------------------------------------------------------------ */
@@ -175,7 +207,7 @@ export function drawCharSelect(
     VIEW_H - 22,
   );
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.fillText('P1: A / D で選択、U で決定   P2: ← → で選択、T で決定', VIEW_W / 2, VIEW_H - 9);
+  ctx.fillText('P1: A / D で選択、U で決定　　P2: ← → で選択、Z で決定', VIEW_W / 2, VIEW_H - 9);
 }
 
 function drawCharInfo(
@@ -401,6 +433,7 @@ export function drawHowTo(ctx: CanvasRenderingContext2D, tick: number): void {
 
   const rows: [string, string][] = [
     ['移動', 'A / D（1P）　← → （2P）'],
+    ['2P のボタン', 'テンキー 4 5 6 / 1 2 3、または Z X C / V B N'],
     ['しゃがみ・ガード', 'S でしゃがみ、後ろを入れるとガード'],
     ['ジャンプ', 'W（前後に入れながらで前後ジャンプ）'],
     ['パンチ', 'U 弱 / I 中 / O 強'],

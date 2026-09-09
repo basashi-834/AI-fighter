@@ -10,10 +10,11 @@ import { ROSTER } from '../data';
 import { FPS, VIEW_H, VIEW_W, toPx } from '../engine/constants';
 import { isActionable } from '../engine/fighter';
 import { DEFAULT_CONFIG, createMatch, stepMatch, type MatchConfig, type MatchState, type TrainingDummyAction } from '../engine/match';
+import { Effects } from '../render/effects';
 import type { CharacterDef } from '../engine/types';
 import { CpuBrain, type Difficulty } from '../ai/cpu';
 import { Renderer, bigText } from '../render/renderer';
-import { STAGES } from '../render/stage';
+import { STAGES, type StageDef } from '../render/stage';
 import { sound } from '../audio/sound';
 import { Controls } from './controls';
 import { drawCharSelect, drawHowTo, drawOptions, drawPause, drawResult, drawTitle, drawVersus, drawTrainingPanel } from './screens';
@@ -86,7 +87,15 @@ export class App {
   match: MatchState | null = null;
   chars: [CharacterDef, CharacterDef] = [ROSTER[0], ROSTER[1]];
   cpu: CpuBrain | null = null;
-  cpuP1: CpuBrain | null = null;
+
+  /** タイトル画面の裏で流している CPU 同士のデモ対戦。 */
+  demo: {
+    state: MatchState;
+    chars: [CharacterDef, CharacterDef];
+    ai: [CpuBrain, CpuBrain];
+    effects: Effects;
+    stage: StageDef;
+  } | null = null;
   paused = false;
   pauseIndex = 0;
   trainingIndex = 0;
@@ -215,11 +224,11 @@ export class App {
   }
 
   private confirmPressed(): boolean {
-    return this.controls.justPressed('Enter', 'Space', 'KeyU', 'Numpad4', 'KeyZ');
+    return this.controls.justPressed('Enter', 'Space', 'KeyU');
   }
 
   private cancelPressed(): boolean {
-    return this.controls.justPressed('Escape', 'Backspace', 'KeyO', 'KeyX');
+    return this.controls.justPressed('Escape', 'Backspace', 'KeyO');
   }
 
   readonly titleItems = [
@@ -233,8 +242,41 @@ export class App {
     { id: 'options', label: '設定', sub: 'OPTIONS' },
   ];
 
+  /**
+   * タイトルの裏で CPU 同士に戦わせる。
+   * 止まった絵より、実際に動いているほうが「どんなゲームか」が伝わります。
+   * アーケードの筐体がやっていたことと同じです。
+   */
+  private updateDemo(): void {
+    if (!this.demo || this.demo.state.matchWinner >= 0 || this.demo.state.frame > 60 * 70) {
+      const pick = () => Math.floor(Math.random() * ROSTER.length);
+      let a = pick();
+      let b = pick();
+      if (a === b) b = (b + 1) % ROSTER.length;
+      const chars: [CharacterDef, CharacterDef] = [ROSTER[a], ROSTER[b]];
+      const state = createMatch(chars, {
+        ...DEFAULT_CONFIG,
+        roundsToWin: 1,
+        timeLimit: 60 * 60,
+      });
+      state.phase = 'fight';
+      this.demo = {
+        state,
+        chars,
+        ai: [new CpuBrain(0, 'hard', Date.now() & 0xffff), new CpuBrain(1, 'hard', (Date.now() >> 3) & 0xffff)],
+        effects: new Effects(),
+        stage: STAGES[Math.floor(Math.random() * STAGES.length)],
+      };
+    }
+    const d = this.demo;
+    stepMatch(d.state, d.chars, [d.ai[0].think(d.state, d.chars), d.ai[1].think(d.state, d.chars)]);
+    d.effects.consume(d.state.events);
+    d.effects.update();
+  }
+
   private updateTitle(): void {
     sound.startMusic('menu');
+    this.updateDemo();
     this.menuIndex = this.menuNav(this.titleItems.length, this.menuIndex);
     if (this.confirmPressed()) {
       sound.ensure();
@@ -288,7 +330,7 @@ export class App {
           this.select.cursor[1] = (this.select.cursor[1] + 1) % n;
           sound.play('menu');
         }
-        if (this.controls.justPressed('Numpad4', 'Numpad1', 'KeyT')) {
+        if (this.controls.justPressed('Numpad4', 'Numpad1', 'KeyZ', 'KeyV')) {
           this.select.locked[1] = true;
           sound.play('select');
         }
@@ -384,7 +426,6 @@ export class App {
     };
     this.match = createMatch(this.chars, config);
     this.cpu = this.vsMode === 'cpu' ? new CpuBrain(1, this.matchDifficulty(), Date.now() & 0xffff) : null;
-    this.cpuP1 = null;
     this.renderer.setStage(STAGES[this.select.stage].id);
     this.renderer.hud.reset();
     this.renderer.effects.clear();
@@ -747,7 +788,7 @@ export class App {
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     switch (this.mode) {
       case 'title':
-        drawTitle(ctx, this.renderer.tick, this.titleItems, this.menuIndex);
+        drawTitle(ctx, this.renderer.tick, this.titleItems, this.menuIndex, this.demo);
         break;
       case 'select':
         drawCharSelect(ctx, this.select, this.vsMode, this.renderer.tick);

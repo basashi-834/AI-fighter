@@ -49,12 +49,15 @@ export const DEFAULT_KEYS: [KeyMap, KeyMap] = [
     down: ['ArrowDown'],
     left: ['ArrowLeft'],
     right: ['ArrowRight'],
-    lp: ['Numpad4', 'KeyT'],
-    mp: ['Numpad5', 'KeyY'],
-    hp: ['Numpad6', 'KeyU'],
-    lk: ['Numpad1', 'KeyG'],
-    mk: ['Numpad2', 'KeyH'],
-    hk: ['Numpad3', 'KeyJ'],
+    // テンキーが無いキーボードでも 2 人で遊べるよう、
+    // 1P と重ならない Z X C V B N を予備に割り当てている。
+    // （1P は W A S D / U I O / J K L を使う）
+    lp: ['Numpad4', 'KeyZ'],
+    mp: ['Numpad5', 'KeyX'],
+    hp: ['Numpad6', 'KeyC'],
+    lk: ['Numpad1', 'KeyV'],
+    mk: ['Numpad2', 'KeyB'],
+    hk: ['Numpad3', 'KeyN'],
   },
 ];
 
