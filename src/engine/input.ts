@@ -205,8 +205,16 @@ export function matchMotion(
   window = MOTION_WINDOW,
 ): boolean {
   if (motion === 'none') return true;
-  if (motion === 'charge_back') return h.chargeBack >= 45 || h.chargeBackReady > 0;
-  if (motion === 'charge_down') return h.chargeDown >= 45 || h.chargeDownReady > 0;
+  // ため技は「ためている」だけでは出ません。ためたうえで反対方向を入れて初めて成立します。
+  // ここを省くと、ガードで後ろを入れているだけで技が暴発します。
+  if (motion === 'charge_back') {
+    const charged = h.chargeBack >= 45 || h.chargeBackReady > 0;
+    return charged && recentDirection(h, facingRight, [6, 9, 3], 6);
+  }
+  if (motion === 'charge_down') {
+    const charged = h.chargeDown >= 45 || h.chargeDownReady > 0;
+    return charged && recentDirection(h, facingRight, [7, 8, 9], 6);
+  }
 
   const seq = MOTION_SEQUENCES[motion];
   if (!seq) return false;
@@ -230,6 +238,14 @@ export function matchMotion(
       while (ago + 1 <= span && toNumpad(inputAt(h, ago + 1), facingRight) === dir) ago++;
     }
     ago++;
+  }
+  return false;
+}
+
+/** 直近 window フレームのあいだに、指定の方向が入っていたか。 */
+function recentDirection(h: InputHistory, facingRight: boolean, dirs: number[], window: number): boolean {
+  for (let ago = 0; ago <= window; ago++) {
+    if (dirs.includes(toNumpad(inputAt(h, ago), facingRight))) return true;
   }
   return false;
 }

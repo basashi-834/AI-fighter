@@ -1,9 +1,10 @@
 import type { CharacterDef } from '../engine/types';
 import { GOUZAN } from './gouzan';
+import { KUROHA } from './kuroha';
 import { RYUGA } from './ryuga';
 import { SAYA } from './saya';
 
-export const ROSTER: CharacterDef[] = [RYUGA, SAYA, GOUZAN];
+export const ROSTER: CharacterDef[] = [RYUGA, SAYA, KUROHA, GOUZAN];
 
 export function characterById(id: string): CharacterDef {
   const c = ROSTER.find((x) => x.id === id);
@@ -11,4 +12,4 @@ export function characterById(id: string): CharacterDef {
   return c;
 }
 
-export { RYUGA, SAYA, GOUZAN };
+export { RYUGA, SAYA, KUROHA, GOUZAN };

@@ -240,6 +240,26 @@ const TEMPEST: AttackPose = {
   rec: P([2, 44], 12, -4, [50, 40], [-40, 44], [50, 30], [-26, 24]),
 };
 
+/** ため技の「衝撃波」。腕を横に払って飛ばす。 */
+const BOOM: AttackPose = {
+  wind: P([-6, 43], -12, 4, [-52, 20], [-30, 40], [-24, 26], [-6, 14]),
+  strike: P([5, 44], 16, -8, [96, 60], [-30, 50], [30, 22], [-26, 20]),
+  rec: P([0, 44], 6, -2, [60, 46], [-24, 48], [16, 18], [-16, 20]),
+};
+
+const SUPER_BOOM: AttackPose = {
+  wind: P([-8, 41], -20, 6, [-60, 14], [-44, 30], [-28, 32], [-8, 14]),
+  strike: P([7, 46], 20, -10, [100, 66], [88, 58], [34, 24], [-30, 20]),
+  rec: P([0, 44], 8, -2, [66, 40], [56, 44], [18, 20], [-18, 22]),
+};
+
+/** ため技の「空裂脚」。しゃがんだ姿勢から真上へ蹴り上げる。 */
+const FLASH_KICK: AttackPose = {
+  wind: P([-2, 30], 8, -2, [30, 66], [-18, 56], [56, -30], [-52, 28]),
+  strike: P([0, 54], -14, -12, [40, 76], [-40, 46], [172, 176], [-22, 40]),
+  rec: P([0, 48], -4, -6, [36, 62], [-30, 50], [130, 40], [-26, 44]),
+};
+
 const THROW_POSE: AttackPose = {
   wind: P([-2, 44], -6, 2, [-10, 90], [-4, 86], [14, 20], [-14, 22]),
   strike: P([6, 42], 20, -6, [82, 88], [74, 82], [30, 26], [-26, 24]),
@@ -277,6 +297,9 @@ export const ATTACK_POSES: Record<string, AttackPose> = {
   headbutt: HEADBUTT,
   cmdgrab: CMDGRAB,
   super_grab: CMDGRAB,
+  boom: BOOM,
+  super_boom: SUPER_BOOM,
+  flash: FLASH_KICK,
   rush: RUSH,
   rising: RISING,
   tempest: TEMPEST,

@@ -5,13 +5,14 @@
 import { ROSTER } from '../data';
 import { FLOOR_SCREEN_Y, VIEW_H, VIEW_W, px } from '../engine/constants';
 import { createFighter, type Fighter } from '../engine/fighter';
+import { ALL_BUTTONS, BUTTON_BITS, inputAt, toNumpad } from '../engine/input';
 import type { MatchState } from '../engine/match';
 import type { CharacterDef } from '../engine/types';
 import { drawFighter } from '../render/fighterArt';
 import { bigText } from '../render/renderer';
 import type { StageDef } from '../render/stage';
 import { STAGES, drawStage } from '../render/stage';
-import type { Settings, SelectState } from './app';
+import { PAUSE_ITEMS, type Settings, type SelectState } from './app';
 
 /** 画面に立たせるだけの、飾り用ファイター。 */
 function dummyFighter(charIndex: number, side: number, x: number, state: Fighter['state'] = 'idle'): Fighter {
@@ -110,49 +111,53 @@ export function drawCharSelect(
   bigText(ctx, 'キャラクター選択', VIEW_W / 2, 26, 18, '#ffffff', '#22264a');
 
   // 中央にカード。
-  const cardW = 82;
-  const gap = 10;
+  const cardH = 104;
+  const gap = 8;
+  const cardW = Math.min(82, Math.floor((VIEW_W - 40 - gap * (ROSTER.length - 1)) / ROSTER.length));
   const totalW = ROSTER.length * cardW + (ROSTER.length - 1) * gap;
-  const startX = (VIEW_W - totalW) / 2;
+  const startX = Math.round((VIEW_W - totalW) / 2);
+  const cardY = 42;
 
   for (let i = 0; i < ROSTER.length; i++) {
     const c = ROSTER[i];
     const x = startX + i * (cardW + gap);
-    const y = 46;
     const p1 = select.cursor[0] === i;
     const p2 = select.cursor[1] === i;
     ctx.fillStyle = '#161a2e';
-    ctx.fillRect(x, y, cardW, 96);
-    // キャラの立ち絵。
+    ctx.fillRect(x, cardY, cardW, cardH);
+    // キャラの立ち絵。体格の大きいキャラが枠からはみ出ないよう縮める。
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x, y, cardW, 96);
+    ctx.rect(x, cardY, cardW, cardH);
     ctx.clip();
+    const scale = Math.min(1, (cardH - 8) / (108 * c.appearance.build));
     const f = dummyFighter(i, 0, 0);
-    ctx.translate(x + cardW / 2 - VIEW_W / 2, y + 96 - FLOOR_SCREEN_Y - 2);
+    ctx.translate(x + cardW / 2, cardY + cardH - 4);
+    ctx.scale(scale, scale);
+    ctx.translate(-VIEW_W / 2, -FLOOR_SCREEN_Y);
     drawFighter(ctx, f, c, 0, VIEW_W, tick);
     ctx.restore();
 
     ctx.strokeStyle = p1 && p2 ? '#ffd94a' : p1 ? '#ff6b6b' : p2 ? '#6bb8ff' : 'rgba(255,255,255,0.2)';
     ctx.lineWidth = p1 || p2 ? 2 : 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, cardW - 1, 96 - 1);
+    ctx.strokeRect(x + 0.5, cardY + 0.5, cardW - 1, cardH - 1);
 
     ctx.textAlign = 'center';
     ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(c.nameJa, x + cardW / 2, y + 110);
+    ctx.fillText(c.nameJa, x + cardW / 2, cardY + cardH + 13);
     ctx.font = '8px "Trebuchet MS", sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.fillText(c.name.toUpperCase(), x + cardW / 2, y + 120);
+    ctx.fillText(c.name.toUpperCase(), x + cardW / 2, cardY + cardH + 23);
   }
 
   // 選ばれているキャラの説明。
   const c1 = ROSTER[select.cursor[0]];
-  panel(ctx, 14, 176, 214, 58);
-  drawCharInfo(ctx, c1, 20, 188, '#ff6b6b', 'P1', select.locked[0]);
+  panel(ctx, 14, 178, 214, 58);
+  drawCharInfo(ctx, c1, 20, 190, '#ff6b6b', 'P1', select.locked[0]);
   const c2 = ROSTER[select.cursor[1]];
-  panel(ctx, VIEW_W - 228, 176, 214, 58);
-  drawCharInfo(ctx, c2, VIEW_W - 222, 188, '#6bb8ff', vsMode === 'local' ? 'P2' : 'CPU', select.locked[1]);
+  panel(ctx, VIEW_W - 228, 178, 214, 58);
+  drawCharInfo(ctx, c2, VIEW_W - 222, 190, '#6bb8ff', vsMode === 'local' ? 'P2' : 'CPU', select.locked[1]);
 
   ctx.textAlign = 'center';
   ctx.font = '9px "Noto Sans JP", sans-serif';
@@ -273,8 +278,7 @@ export function drawPause(ctx: CanvasRenderingContext2D, index: number): void {
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   ctx.textAlign = 'center';
   bigText(ctx, 'PAUSE', VIEW_W / 2, 82, 26, '#ffffff', '#222');
-  const items = ['続ける', '仕切り直し', 'キャラクター選択', 'タイトルへ'];
-  items.forEach((label, i) => {
+  PAUSE_ITEMS.forEach((label, i) => {
     const y = 116 + i * 22;
     const on = i === index;
     ctx.font = `bold ${on ? 14 : 12}px "Noto Sans JP", sans-serif`;
@@ -310,6 +314,59 @@ export function drawTrainingPanel(
 }
 
 /* ------------------------------------------------------------------ */
+
+/**
+ * 入力表示（トレーニング用）。
+ *
+ * 「今なにを入れたつもりだったのか」が見えると、
+ * 技が出なかった理由がその場で分かります。
+ * 方向はテンキー表記、ボタンは押した瞬間だけ出します。
+ */
+export function drawInputDisplay(ctx: CanvasRenderingContext2D, f: Fighter): void {
+  const rows = 14;
+  const x = 12;
+  const bottom = 236;
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,8,18,0.34)';
+  ctx.fillRect(x - 5, bottom - rows * 9 - 12, 66, rows * 9 + 14);
+  ctx.font = '8px "Noto Sans JP", sans-serif';
+  ctx.fillStyle = 'rgba(143,208,255,0.75)';
+  ctx.textAlign = 'left';
+  ctx.fillText('入力', x, bottom - rows * 9 - 3);
+
+  // 新しいものほど下。格闘ゲームの入力表示はこの向きが標準。
+  for (let i = 0; i < rows; i++) {
+    const bits = inputAt(f.input, i);
+    const prev = inputAt(f.input, i + 1);
+    const dir = toNumpad(bits, f.facingRight);
+    const y = bottom - i * 9;
+    const fade = 1 - i / rows;
+    ctx.globalAlpha = 0.25 + fade * 0.75;
+    // 方向。
+    ctx.fillStyle = dir === 5 ? 'rgba(255,255,255,0.3)' : '#ffffff';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(ARROWS[dir] ?? '・', x, y);
+    // 押した瞬間のボタンだけ。
+    let bx = x + 14;
+    ctx.font = 'bold 8px "Noto Sans JP", sans-serif';
+    for (const b of ALL_BUTTONS) {
+      const bit = BUTTON_BITS[b];
+      if ((bits & bit) !== 0 && (prev & bit) === 0) {
+        ctx.fillStyle = b.endsWith('P') ? '#ff9a6b' : '#6bd0ff';
+        ctx.fillText(BTN_LABEL[b], bx, y);
+        bx += 15;
+      }
+    }
+  }
+  ctx.restore();
+}
+
+const ARROWS: Record<number, string> = {
+  1: '↙', 2: '↓', 3: '↘', 4: '←', 5: '・', 6: '→', 7: '↖', 8: '↑', 9: '↗',
+};
+const BTN_LABEL: Record<string, string> = {
+  LP: '弱P', MP: '中P', HP: '強P', LK: '弱K', MK: '中K', HK: '強K',
+};
 
 export function drawHowTo(ctx: CanvasRenderingContext2D, tick: number): void {
   ctx.fillStyle = '#0a0c1a';

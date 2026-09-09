@@ -11,6 +11,7 @@ import {
   IN_DOWN,
   IN_LEFT,
   IN_RIGHT,
+  IN_UP,
   createHistory,
   matchDoubleTap,
   matchMotion,
@@ -154,5 +155,33 @@ describe('押しっぱなしによる誤爆の防止', () => {
   it('ゆっくり 236236 を入れれば成立する', () => {
     const h = feed(D, D, DF, DF, F, F, N, N, D, D, DF, DF, F, F);
     expect(matchMotion(h, '236236', true)).toBe(true);
+  });
+});
+
+describe('ため技', () => {
+  it('後ろにためてから前を入れると成立する', () => {
+    const h = feed(...repeat(B, 50), F);
+    expect(matchMotion(h, 'charge_back', true)).toBe(true);
+  });
+
+  it('ためが足りなければ出ない', () => {
+    const h = feed(...repeat(B, 20), F);
+    expect(matchMotion(h, 'charge_back', true)).toBe(false);
+  });
+
+  it('ためているだけでは出ない（ガード中に暴発しない）', () => {
+    // ここが甘いと、後ろを入れてガードしているだけで技が出てしまう。
+    const h = feed(...repeat(B, 90));
+    expect(matchMotion(h, 'charge_back', true)).toBe(false);
+  });
+
+  it('下にためてから上を入れると成立する', () => {
+    const h = feed(...repeat(D, 50), IN_UP);
+    expect(matchMotion(h, 'charge_down', true)).toBe(true);
+  });
+
+  it('しゃがみっぱなしでは上ため技は出ない', () => {
+    const h = feed(...repeat(D, 90));
+    expect(matchMotion(h, 'charge_down', true)).toBe(false);
   });
 });

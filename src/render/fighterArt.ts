@@ -368,13 +368,15 @@ function drawHair(
     }
     case 'spiky': {
       ctx.beginPath();
-      ctx.arc(c.x, c.y - r * 0.1, r * 1.05, Math.PI * 0.9, Math.PI * 2.1);
+      ctx.arc(c.x, c.y - r * 0.16, r * 1.04, Math.PI * 0.9, Math.PI * 2.1);
       ctx.fill();
-      for (let i = -2; i <= 2; i++) {
+      // 逆立てた髪。後ろへ流す。とがらせすぎると冠のように見えるので控えめに。
+      for (let i = -1; i <= 2; i++) {
+        const bx = c.x - s * i * r * 0.4;
         ctx.beginPath();
-        ctx.moveTo(c.x + i * r * 0.42, c.y - r * 0.6);
-        ctx.lineTo(c.x + i * r * 0.42 + s * r * 0.25, c.y - r * 1.9);
-        ctx.lineTo(c.x + i * r * 0.42 + r * 0.34, c.y - r * 0.6);
+        ctx.moveTo(bx - r * 0.22, c.y - r * 0.7);
+        ctx.lineTo(bx - s * r * 0.45, c.y - r * 1.35);
+        ctx.lineTo(bx + r * 0.24, c.y - r * 0.7);
         ctx.fill();
       }
       break;

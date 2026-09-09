@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { GOUZAN, ROSTER, RYUGA, SAYA } from '../src/data';
+import { GOUZAN, KUROHA, ROSTER, RYUGA, SAYA } from '../src/data';
 import { createMatch, stepMatch } from '../src/engine/match';
 import { CpuBrain, type Difficulty } from '../src/ai/cpu';
 import type { CharacterDef } from '../src/engine/types';
@@ -206,4 +206,41 @@ describe('連打相手との勝負', () => {
     for (let i = 0; i < n; i++) if (vsMasher('easy', i) === 1) w++;
     expect(w, `やさしい CPU の対連打勝率 ${w}/${n}`).toBeLessThanOrEqual(6);
   }, 60000);
+});
+
+/**
+ * ため技キャラは、その場でためはじめると 48 フレーム棒立ちになってしまいます。
+ * CPU も人間と同じで、待っているあいだにためておく必要があります。
+ */
+describe('ため技キャラの CPU', () => {
+  it('黒羽の CPU がため技（衝撃波・空裂脚）を実際に出す', () => {
+    const chars: [CharacterDef, CharacterDef] = [KUROHA, RYUGA];
+    const s = createMatch(chars, {
+      roundsToWin: 5, timeLimit: 0, training: false,
+      autoRecover: false, dummyAction: 'stand', infiniteMeter: false,
+    });
+    s.phase = 'fight';
+    const a = new CpuBrain(0, 'hard', 55);
+    const b = new CpuBrain(1, 'normal', 66);
+    const used = new Set<string>();
+    for (let i = 0; i < 60 * 90; i++) {
+      stepMatch(s, chars, [a.think(s, chars), b.think(s, chars)]);
+      const f = s.fighters[0];
+      if (f.moveIndex >= 0 && f.moveFrame === 1) {
+        const m = KUROHA.moves[f.moveIndex];
+        if (m.input.motion.startsWith('charge')) used.add(m.id);
+      }
+    }
+    expect(used.size, `出したため技: ${[...used].join(', ')}`).toBeGreaterThan(0);
+  }, 60000);
+
+  it('黒羽の CPU も他のキャラ相手に勝てる', () => {
+    let wins = 0;
+    for (const other of ROSTER) {
+      for (let i = 0; i < 3; i++) {
+        if (duel('hard', 'hard', i, [KUROHA, other]) === 0) wins++;
+      }
+    }
+    expect(wins, `黒羽の勝ち数 ${wins}/12`).toBeGreaterThan(2);
+  }, 120000);
 });

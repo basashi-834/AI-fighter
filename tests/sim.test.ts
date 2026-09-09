@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { GOUZAN, ROSTER, RYUGA, SAYA } from '../src/data';
+import { GOUZAN, KUROHA, ROSTER, RYUGA, SAYA } from '../src/data';
 import { METER_PER_BAR, px, toPx } from '../src/engine/constants';
 import { isActionable } from '../src/engine/fighter';
 import { IN_DOWN, IN_LEFT, IN_RIGHT, IN_UP } from '../src/engine/input';
@@ -369,5 +369,37 @@ describe('姿勢と行動', () => {
     rig.step(IN_RIGHT, 0);
     for (let i = 0; i < 20; i++) rig.step(IN_RIGHT, 0);
     expect(a.x - x0).toBeGreaterThan(px(40));
+  });
+});
+
+describe('黒羽（ため技キャラ）', () => {
+  it('後ろにためてから前 + 強Pで衝撃波が出る', () => {
+    const rig = makeRig(KUROHA, RYUGA, 200);
+    for (let i = 0; i < 50; i++) rig.step(IN_LEFT, 0);
+    rig.step(IN_RIGHT, 0);
+    rig.step(IN_RIGHT | press('HP'), 0);
+    let spawned = false;
+    for (let i = 0; i < 60; i++) {
+      if (rig.step(0, 0).some((e) => e.type === 'projectile')) spawned = true;
+    }
+    expect(spawned).toBe(true);
+  });
+
+  it('ためずに強Pを押しても衝撃波は出ない（立ち強Pになる）', () => {
+    const rig = makeRig(KUROHA, RYUGA, 200);
+    rig.step(IN_RIGHT, 0);
+    rig.step(IN_RIGHT | press('HP'), 0);
+    const a = rig.state.fighters[0];
+    expect(a.state).toBe('attack');
+    expect(KUROHA.moves[a.moveIndex].id).toBe('5hp');
+  });
+
+  it('下にためてから上 + 強Kで空裂脚が出て、出がかりに無敵がある', () => {
+    const rig = makeRig(KUROHA, RYUGA, 60);
+    for (let i = 0; i < 50; i++) rig.step(IN_DOWN, 0);
+    rig.step(IN_UP | press('HK'), 0);
+    const a = rig.state.fighters[0];
+    expect(KUROHA.moves[a.moveIndex]?.id).toBe('flash');
+    expect(KUROHA.moves[a.moveIndex].invuln?.[0].kind).toBe('full');
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ROSTER, RYUGA, SAYA, GOUZAN } from '../src/data';
+import { ROSTER, RYUGA, SAYA, GOUZAN, KUROHA } from '../src/data';
 import { hitstunOf, moveTotal, isActionable } from '../src/engine/fighter';
 import { findMove, makeRig, measureAdvantage, press } from './harness';
 
@@ -63,6 +63,8 @@ describe('硬直差', () => {
     ['saya', '5lp'],
     ['saya', '5mk'],
     ['gouzan', '5mk'],
+    ['kuroha', '5mk'],
+    ['kuroha', '2mk'],
   ];
 
   for (const [charId, moveId] of cases) {
@@ -159,6 +161,14 @@ describe('ガードの種類', () => {
 });
 
 describe('キャラクターの個性が数値に出ている', () => {
+  it('黒羽はリーチが長いかわりに発生が遅い', () => {
+    const k = KUROHA.moves.find((m) => m.id === '5mk')!;
+    const r = RYUGA.moves.find((m) => m.id === '5mk')!;
+    const reach = (m: typeof k) => m.hitboxes.reduce((x, b) => Math.max(x, b.x + b.w), 0);
+    expect(reach(k)).toBeGreaterThan(reach(r));
+    expect(k.startup).toBeGreaterThan(r.startup);
+  });
+
   it('紗夜は最速、剛山は最も体力が多い', () => {
     expect(SAYA.moves.find((m) => m.id === '5lp')!.startup).toBe(3);
     expect(GOUZAN.health).toBeGreaterThan(RYUGA.health);

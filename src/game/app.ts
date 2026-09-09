@@ -17,6 +17,8 @@ import { STAGES } from '../render/stage';
 import { sound } from '../audio/sound';
 import { Controls } from './controls';
 import { drawCharSelect, drawHowTo, drawOptions, drawPause, drawResult, drawTitle, drawVersus, drawTrainingPanel } from './screens';
+import { drawMoveList } from './movelist';
+import { drawInputDisplay } from './screens';
 import { NetSession } from '../net/session';
 
 export type Mode =
@@ -27,6 +29,7 @@ export type Mode =
   | 'result'
   | 'howto'
   | 'options'
+  | 'movelist'
   | 'online';
 
 export interface Settings {
@@ -76,6 +79,10 @@ export class App {
   paused = false;
   pauseIndex = 0;
   trainingIndex = 0;
+  moveListChar = 0;
+  moveListScroll = 0;
+  /** 技表から戻る先。 */
+  private moveListReturn: Mode = 'title';
   net: NetSession | null = null;
 
   private slowCounter = 0;
@@ -174,6 +181,9 @@ export class App {
       case 'options':
         this.updateSubScreen();
         break;
+      case 'movelist':
+        this.updateMoveList();
+        break;
       case 'online':
         this.updateOnline();
         break;
@@ -206,6 +216,7 @@ export class App {
     { id: 'local', label: '2 人対戦', sub: '1 台のキーボードで' },
     { id: 'training', label: 'トレーニング', sub: '技と判定の確認' },
     { id: 'online', label: 'オンライン対戦', sub: 'ロールバック方式' },
+    { id: 'movelist', label: '技表', sub: 'MOVE LIST' },
     { id: 'howto', label: '操作説明', sub: 'HOW TO PLAY' },
     { id: 'options', label: '設定', sub: 'OPTIONS' },
   ];
@@ -217,6 +228,10 @@ export class App {
       sound.play('select');
       const id = this.titleItems[this.menuIndex].id;
       if (id === 'howto') this.mode = 'howto';
+      else if (id === 'movelist') {
+        this.mode = 'movelist';
+        this.moveListScroll = 0;
+      }
       else if (id === 'options') this.mode = 'options';
       else if (id === 'online') {
         this.vsMode = 'online';
@@ -412,8 +427,7 @@ export class App {
   }
 
   private updatePause(): void {
-    const items = ['続ける', '仕切り直し', 'キャラクター選択', 'タイトルへ'];
-    this.pauseIndex = this.menuNav(items.length, this.pauseIndex);
+    this.pauseIndex = this.menuNav(PAUSE_ITEMS.length, this.pauseIndex);
     if (this.confirmPressed()) {
       sound.play('select');
       switch (this.pauseIndex) {
@@ -424,11 +438,18 @@ export class App {
           this.beginMatch();
           break;
         case 2:
+          // 技表。試合はそのまま残しておき、閉じたら戻ってくる。
+          this.moveListChar = ROSTER.indexOf(this.chars[0]);
+          this.moveListScroll = 0;
+          this.moveListReturn = 'fight';
+          this.mode = 'movelist';
+          break;
+        case 3:
           this.mode = 'select';
           this.select.locked = [false, false];
           sound.stopMusic();
           break;
-        case 3:
+        case 4:
           this.mode = 'title';
           sound.stopMusic();
           break;
@@ -488,6 +509,26 @@ export class App {
     }
     if (this.cancelPressed() || this.confirmPressed()) {
       this.mode = 'title';
+      sound.play('menu');
+    }
+  }
+
+  private updateMoveList(): void {
+    if (this.controls.justPressed('KeyW', 'ArrowUp')) this.moveListScroll--;
+    if (this.controls.justPressed('KeyS', 'ArrowDown')) this.moveListScroll++;
+    this.moveListScroll = Math.max(0, this.moveListScroll);
+    if (this.controls.justPressed('KeyA', 'ArrowLeft')) {
+      this.moveListChar = (this.moveListChar - 1 + ROSTER.length) % ROSTER.length;
+      this.moveListScroll = 0;
+      sound.play('menu');
+    }
+    if (this.controls.justPressed('KeyD', 'ArrowRight')) {
+      this.moveListChar = (this.moveListChar + 1) % ROSTER.length;
+      this.moveListScroll = 0;
+      sound.play('menu');
+    }
+    if (this.cancelPressed()) {
+      this.mode = this.moveListReturn;
       sound.play('menu');
     }
   }
@@ -650,6 +691,7 @@ export class App {
           this.renderer.render(ctx, this.match, this.chars);
           if (this.match.config.training) {
             drawTrainingPanel(ctx, this.match, this.chars);
+            drawInputDisplay(ctx, this.match.fighters[0]);
           }
           if (this.vsMode === 'online') this.net?.drawNetHud(ctx);
           if (this.paused) drawPause(ctx, this.pauseIndex);
@@ -667,6 +709,9 @@ export class App {
       case 'options':
         drawOptions(ctx, this.settings, this.optionIndex);
         break;
+      case 'movelist':
+        drawMoveList(ctx, ROSTER[this.moveListChar], this.moveListScroll, this.moveListChar, ROSTER.length);
+        break;
       case 'online':
         this.net?.draw(ctx, this.renderer.tick);
         break;
@@ -674,6 +719,9 @@ export class App {
     ctx.restore();
   }
 }
+
+/** ポーズ中のメニュー項目。画面側と共有する。 */
+export const PAUSE_ITEMS = ['続ける', '仕切り直し', '技表', 'キャラクター選択', 'タイトルへ'];
 
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, Math.round(n * 10) / 10));

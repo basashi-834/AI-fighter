@@ -152,8 +152,7 @@ export class CpuBrain {
       if (me.state === 'wakeup' && me.stateFrame >= me.stateDuration - 3) {
         const rev = this.findMove(myChar, (m) => m.aiTags?.includes('reversal') ?? false);
         if (rev && this.chance(p.reversal) && me.meter >= (rev.meterCost ?? 0)) {
-          this.queueMove(myChar, rev, me.facingRight);
-          return this.queue.shift() ?? 0;
+          if (this.queueMove(myChar, rev, me)) return this.queue.shift() ?? 0;
         }
       }
       return back;
@@ -165,10 +164,7 @@ export class CpuBrain {
       const cur = currentMove(me, myChar);
       if (cur && (me.moveHit || me.moveBlocked) && this.chance(p.execution)) {
         const target = this.pickCancelTarget(myChar, cur, me);
-        if (target) {
-          this.queueMove(myChar, target, me.facingRight);
-          return this.queue.shift() ?? 0;
-        }
+        if (target && this.queueMove(myChar, target, me)) return this.queue.shift() ?? 0;
       }
       return 0;
     }
@@ -179,10 +175,7 @@ export class CpuBrain {
     if (seen && seen.oppY > 26 && seen.oppVy < 0 && dist < 92 && me.y === 0) {
       if (this.chance(p.antiAir)) {
         const aa = this.findMove(myChar, (m) => (m.aiTags?.includes('antiAir') ?? false) && (m.meterCost ?? 0) <= me.meter);
-        if (aa) {
-          this.queueMove(myChar, aa, me.facingRight);
-          return this.queue.shift() ?? 0;
-        }
+        if (aa && this.queueMove(myChar, aa, me)) return this.queue.shift() ?? 0;
       }
     }
 
@@ -196,10 +189,7 @@ export class CpuBrain {
     const punish = this.punishWindow(opp, chars[1 - this.side]);
     if (punish > 0 && dist < 80) {
       const best = this.bestPunish(myChar, me, punish, dist);
-      if (best) {
-        this.queueMove(myChar, best, me.facingRight);
-        return this.queue.shift() ?? 0;
-      }
+      if (best && this.queueMove(myChar, best, me)) return this.queue.shift() ?? 0;
     }
 
     // --- 作戦を決めなおす ---
@@ -218,15 +208,15 @@ export class CpuBrain {
         const ready = proj && s.frame - this.lastAttackFrame > 34;
         // 相手が空中にいるときに飛び道具を撃つと、そのまま跳び込まれる。
         const safe = opp.y === 0;
-        if (ready && safe) {
+        if (ready && safe && this.queueMove(myChar, proj!, me)) {
           this.lastAttackFrame = s.frame;
           this.planTimer = 0; // 撃ったら作戦を組み直す
-          this.queueMove(myChar, proj!, me.facingRight);
           return this.queue.shift() ?? 0;
         }
         // 撃てないあいだ下がりっぱなしだと、ただ画面端に追い込まれる。
         // 間合いを保つだけにして、近すぎるときだけ下がる。
         if (dist < 90) return back;
+        if (this.hasChargeMoves(myChar) && me.input.chargeBack < 45) return back;
         this.planTimer = Math.min(this.planTimer, 8);
         return 0;
       }
@@ -253,18 +243,21 @@ export class CpuBrain {
       case 'pressure': {
         if (s.frame - this.lastAttackFrame < 10) return 0;
         const atk = this.pickPressureMove(myChar, me, dist, p);
-        if (atk) {
+        if (atk && this.queueMove(myChar, atk, me)) {
           this.lastAttackFrame = s.frame;
-          this.queueMove(myChar, atk, me.facingRight);
           return this.queue.shift() ?? 0;
         }
         // 届く技が無いなら、まず間合いを詰める。空振りは反撃のもと。
         return forward;
       }
-      default:
+      default: {
+        // ため技を持つキャラは、待っているあいだに後ろを入れてためておく。
+        // 人間のため技キャラも、ずっとそうしています。
+        if (this.hasChargeMoves(myChar) && me.input.chargeBack < 45 && dist > 70) return back;
         // 立ちっぱなしにせず、細かく前後に動いて間合いを測る。
         if (this.chance(p.idleBias)) return 0;
         return dist > 120 ? forward : this.chance(50) ? back : forward;
+      }
     }
   }
 
@@ -429,11 +422,17 @@ export class CpuBrain {
   }
 
   /**
-   * 技を出すための入力を予約する。
-   * 必殺技なら、コマンドを 1 フレームずつ本当に入力する。
+   * 技を出すための入力を予約する。出せないときは false を返す。
+   *
+   * 必殺技なら、コマンドを 1 フレームずつ本当に入力します。
+   * ため技だけは例外で、その場でためはじめると 48 フレームも棒立ちになるため、
+   * 「すでにたまっているときだけ出す」ようにしています。
+   * ためは普段の後ろ歩き・ガードのあいだに勝手にできているので、
+   * 人間のため技キャラの動きとほぼ同じになります。
    */
-  private queueMove(char: CharacterDef, move: MoveDef, facingRight: boolean): void {
+  private queueMove(char: CharacterDef, move: MoveDef, me: Fighter): boolean {
     void char;
+    const facingRight = me.facingRight;
     const F = facingRight ? IN_RIGHT : IN_LEFT;
     const B = facingRight ? IN_LEFT : IN_RIGHT;
     const D = IN_DOWN;
@@ -444,17 +443,37 @@ export class CpuBrain {
         ? BUTTON_BITS[move.input.button as Button]
         : IN_LP | IN_MP;
 
+    if (move.input.motion === 'charge_back') {
+      if (me.input.chargeBack < 45 && me.input.chargeBackReady <= 0) return false;
+      this.queue.push(F, F | btn, F | btn);
+      return true;
+    }
+    if (move.input.motion === 'charge_down') {
+      if (me.input.chargeDown < 45 && me.input.chargeDownReady <= 0) return false;
+      this.queue.push(U, U | btn, U | btn);
+      return true;
+    }
+
+    // しゃがみ技は下を入れたまま押す。
+    if (move.input.stances.includes('crouch') && !move.input.stances.includes('stand')) {
+      this.queue.push(D, D, D | btn, D | btn);
+      return true;
+    }
+
     const seq = motionSequence(move.input.motion, F, B, D, U);
     for (const dir of seq) this.queue.push(dir);
     // 最後にボタンを足す（方向はコマンドの終わりの向きを保つ）。
     const last = seq.length > 0 ? seq[seq.length - 1] : 0;
     this.queue.push(last | btn);
     this.queue.push(last | btn);
+    return true;
+  }
 
-    // しゃがみ技は下を入れたまま押す。
-    if (move.input.stances.includes('crouch') && !move.input.stances.includes('stand')) {
-      this.queue = [D, D, D | btn, D | btn];
-    }
+  /** このキャラがため技を持っているか。 */
+  private hasChargeMoves(char: CharacterDef): boolean {
+    return char.moves.some(
+      (m) => m.input.motion === 'charge_back' || m.input.motion === 'charge_down',
+    );
   }
 }
 
