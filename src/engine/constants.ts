@@ -72,6 +72,25 @@ export const ROUNDS_TO_WIN = 2;
 /** ダメージ補正の下限（%）。 */
 export const MIN_SCALING = 10;
 
+/**
+ * 空中の相手を続けて打ち上げられる回数の上限。
+ * これが無いと、浮かせた相手を延々と殴り続けられてしまいます。
+ */
+export const JUGGLE_LIMIT = 4;
+
+/**
+ * のけぞり時間の減衰。
+ *
+ * コンボが伸びるほど、のけぞりが 1 フレームずつ短くなります。
+ * これが無いと「発生 4F・ヒット +5F」の弱パンチが自分自身に
+ * 永久につながってしまいます（+5 >= 4 なので、いつまでも間に合う）。
+ * 減っていくことで、3 発目あたりで自然につながらなくなります。
+ */
+export const HITSTUN_DECAY_START = 2;
+export const HITSTUN_DECAY_MAX = 6;
+/** 減衰しても、元ののけぞりのこの割合は下回らない（%）。 */
+export const HITSTUN_DECAY_FLOOR = 60;
+
 /** のけぞり中に受け身を取れない（ダウン）時間などの共通値。 */
 export const WAKEUP_FRAMES = 26;
 export const HARD_KNOCKDOWN_FRAMES = 46;

@@ -89,11 +89,11 @@ const specials: MoveDef[] = [
     name: 'Earth Breaker',
     nameJa: '大地砕き',
     input: { motion: '63214', button: 'HP', stances: ['stand', 'crouch'] },
-    startup: 6,
+    startup: 5,
     active: 3,
-    recovery: 34,
+    recovery: 36,
     hitboxes: [],
-    hit: hit({ damage: 170, guard: 'unblockable', knockdown: 'hard', effect: 'heavy', shake: 9 }),
+    hit: hit({ damage: 200, guard: 'unblockable', knockdown: 'hard', effect: 'heavy', shake: 9 }),
     throwSpec: {
       range: 66,
       hitsAir: false,
@@ -101,7 +101,7 @@ const specials: MoveDef[] = [
       holdFrames: 20,
       techable: false,
       dropX: 8,
-      damage: 170,
+      damage: 200,
       knockdown: 'hard',
       launchX: 0,
       launchY: 0,
@@ -212,16 +212,33 @@ export const GOUZAN: CharacterDef = {
   ai: { aggression: 72, defense: 45, zoning: 10, execution: 65 },
   moves: [
     ...buildNormals(
-      { reach: 1.08, power: 1.15, startupDelta: 1, recoveryDelta: 2, build: 1.12 },
+      { reach: 1.08, power: 1, build: 1.12 },
+      // ---- スト 6 のザンギエフのフレームデータを参考にした数値 ----
+      //
+      // 「全体的にワンテンポ遅いが、一発が重い」「足払いは長いが
+      // ガードされたら終わり」というザンギエフらしさを数値にしています。
+      // 体力 11000 → このゲームの 1150 に合わせ、ダメージも 1/10。
       {
-        // 立ち強パンチは長く、遅く、重い。差し返し用。
-        '5hp': { f: [12, 4, 20], damage: 110, adv: [4, -6], boxes: [[10, 54, 74, 30]], shake: 6 },
-        // 立ち中キックはアーマー付きの技へ繋ぐ主力。
-        '5mk': { f: [9, 4, 15], damage: 78, adv: [3, -3], boxes: [[12, 34, 68, 26]] },
-        // しゃがみ強パンチが対空。判定が大きい。
-        '2hp': { f: [7, 6, 20], damage: 100, adv: [12, -10], boxes: [[2, 46, 54, 62]] },
-        // 足払いは遅いが超のばし。
-        '2hk': { f: [12, 4, 24], damage: 100, adv: [22, -14], boxes: [[10, 2, 82, 20]] },
+        '5lp': { f: [5, 3, 9], adv: [3, -2], damage: 40 },
+        '5mp': { f: [7, 3, 14], adv: [4, -2], damage: 70 },
+        '5hp': { f: [11, 4, 22], adv: [3, -5], damage: 90, boxes: [[10, 54, 74, 30]] },
+        '5lk': { f: [6, 3, 10], adv: [2, -3], damage: 40 },
+        '5mk': { f: [8, 4, 16], adv: [2, -4], damage: 70, boxes: [[12, 34, 68, 26]] },
+        '5hk': { f: [13, 4, 22], adv: [8, -8], damage: 90 },
+        '2lp': { f: [5, 3, 9], adv: [3, -2], damage: 40 },
+        '2mp': { f: [7, 3, 15], adv: [3, -3], damage: 60 },
+        // 対空。判定が大きく、めくり気味の飛びも落とせる。
+        '2hp': { f: [9, 5, 22], adv: [10, -9], damage: 90, boxes: [[2, 46, 54, 62]] },
+        '2lk': { f: [5, 3, 10], adv: [1, -4], damage: 30 },
+        '2mk': { f: [8, 4, 18], adv: [0, -6], damage: 60 },
+        // 足払い。長いが -14F。ガードされたら何をされてもおかしくない。
+        '2hk': { f: [11, 4, 26], adv: [22, -14], damage: 100, boxes: [[10, 2, 82, 20]] },
+        'jlp': { f: [6, 6, 8], adv: [6, 3], damage: 40 },
+        'jmp': { f: [7, 6, 10], adv: [6, 3], damage: 70 },
+        'jhp': { f: [9, 5, 12], adv: [7, 4], damage: 90 },
+        'jlk': { f: [6, 6, 8], adv: [6, 3], damage: 40 },
+        'jmk': { f: [8, 8, 10], adv: [6, 3], damage: 70 },
+        'jhk': { f: [10, 5, 14], adv: [7, 4], damage: 100 },
       },
     ),
     makeThrow('throw', '投げ捨て', 150, 56),

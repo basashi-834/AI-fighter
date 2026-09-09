@@ -120,6 +120,15 @@ export interface Fighter {
 
   /** 相手に「詰められている」量。押し合いの解決に使う。 */
   pushX: number;
+
+  /**
+   * 攻撃を当てた／受けたことによる押し戻しの速度。
+   *
+   * 移動やジャンプの速度（vx）とは別に持ちます。
+   * こうしておくと、技を出している最中でも押し戻しだけを効かせられます。
+   * 画面端で「相手が下がれないぶん、殴っているほうが下がる」を作るのに必要です。
+   */
+  pushVx: number;
 }
 
 export function createFighter(charIndex: number, side: number, char: CharacterDef, x: number): Fighter {
@@ -168,6 +177,7 @@ export function createFighter(charIndex: number, side: number, char: CharacterDe
     input: createHistory(),
     lastInput: 0,
     pushX: 0,
+    pushVx: 0,
   };
 }
 

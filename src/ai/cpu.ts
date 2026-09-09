@@ -49,8 +49,8 @@ interface DifficultyParams {
 }
 
 const PARAMS: Record<Difficulty, DifficultyParams> = {
-  easy:   { reaction: 24, aggression: 30, block: 35, antiAir: 15, execution: 25, reversal: 5,  techThrow: 5,  idleBias: 55 },
-  normal: { reaction: 16, aggression: 50, block: 62, antiAir: 45, execution: 60, reversal: 15, techThrow: 25, idleBias: 35 },
+  easy:   { reaction: 26, aggression: 28, block: 30, antiAir: 12, execution: 20, reversal: 4,  techThrow: 5,  idleBias: 62 },
+  normal: { reaction: 15, aggression: 54, block: 68, antiAir: 52, execution: 68, reversal: 16, techThrow: 28, idleBias: 32 },
   hard:   { reaction: 10, aggression: 70, block: 84, antiAir: 75, execution: 85, reversal: 30, techThrow: 55, idleBias: 18 },
   expert: { reaction: 5,  aggression: 84, block: 96, antiAir: 94, execution: 97, reversal: 45, techThrow: 80, idleBias: 8 },
 };
@@ -140,11 +140,36 @@ export class CpuBrain {
     const forward = me.facingRight ? IN_RIGHT : IN_LEFT;
     const back = me.facingRight ? IN_LEFT : IN_RIGHT;
 
-    // --- 反撃されている最中 ---
-    if (me.state === 'hitstun' || me.state === 'blockstun') {
-      // ガードは入れっぱなしにしておく（ガード硬直中も後ろを入れる）。
+    // --- 攻撃を受けている最中 ---
+    if (me.state === 'hitstun') {
+      // のけぞり中は何もできない。ガードを入れ続けて、明けた瞬間に備える。
       const low = this.opponentAttackIsLow(opp, chars[1 - this.side]);
       return back | (low ? IN_DOWN : 0);
+    }
+
+    if (me.state === 'blockstun') {
+      const low = this.opponentAttackIsLow(opp, chars[1 - this.side]);
+      const guard = back | (low ? IN_DOWN : 0);
+      // ガード硬直が明ける直前。ここで手を出すかどうかを決める。
+      //
+      // ガードしているだけでは、こちらの番はいつまでも来ません。
+      // 実際の対戦でも「ガードして、相手の硬直が終わる前に自分の速い技を置く」
+      // のが基本で、これができないと押しっぱなしの相手に何もできなくなります。
+      if (me.stateDuration - me.stateFrame > 1) return guard;
+
+      const window = this.punishWindow(opp, chars[1 - this.side]);
+      if (window > 0 && this.chance(p.execution)) {
+        // 相手の硬直に確実に間に合う技があるなら、それを差し込む。
+        const best = this.bestPunish(myChar, me, window + 1, dist);
+        if (best && this.queueMove(myChar, best, me)) return this.queue.shift() ?? 0;
+      }
+      // 確定はしなくても、いちばん速い技で「押し返す」。
+      // 相手が次に振ってくる技より速ければ、こちらが先に当たる。
+      if (this.chance((p.aggression + p.execution) / 2)) {
+        const quick = this.fastestReaching(myChar, me, dist);
+        if (quick && this.queueMove(myChar, quick, me)) return this.queue.shift() ?? 0;
+      }
+      return guard;
     }
 
     // --- 起き上がり ---
@@ -415,6 +440,20 @@ export class CpuBrain {
     if (all.length === 0) return null;
     all.sort((a, b) => b.hit.damage - a.hit.damage);
     return all[Math.floor(this.rand() * Math.min(3, all.length))];
+  }
+
+  /** 今の距離に届く技の中で、いちばん発生が速いもの。 */
+  private fastestReaching(char: CharacterDef, me: Fighter, dist: number): MoveDef | null {
+    let best: MoveDef | null = null;
+    for (const m of char.moves) {
+      if (m.input.motion !== 'none' || !m.input.button) continue;
+      if (m.input.stances.includes('air')) continue;
+      if (m.throwSpec) continue;
+      if ((m.meterCost ?? 0) > me.meter) continue;
+      if (reachOf(m) < dist) continue;
+      if (!best || m.startup < best.startup) best = m;
+    }
+    return best;
   }
 
   private findMove(char: CharacterDef, pred: (m: MoveDef) => boolean): MoveDef | null {

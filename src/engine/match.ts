@@ -13,6 +13,10 @@
 import {
   FP,
   HARD_KNOCKDOWN_FRAMES,
+  HITSTUN_DECAY_FLOOR,
+  HITSTUN_DECAY_MAX,
+  HITSTUN_DECAY_START,
+  JUGGLE_LIMIT,
   MAX_SEPARATION,
   METER_PER_BAR,
   MIN_SCALING,
@@ -205,6 +209,20 @@ export function cloneMatch(s: MatchState): MatchState {
 
 function emit(s: MatchState, e: SimEvent): void {
   s.events.push(e);
+}
+
+/**
+ * のけぞりの減衰。コンボが伸びるほど、のけぞりが短くなる。
+ *
+ * これが無いと、ヒット時硬直差が自分の発生以上ある技（弱パンチなど）が
+ * 自分自身に永久につながってしまいます。減衰があると、
+ * 数発で硬直差が発生フレームを下回り、自然にコンボが終わります。
+ */
+export function hitstunDecay(baseStun: number, comboHits: number): number {
+  const over = Math.max(0, comboHits - HITSTUN_DECAY_START);
+  const cut = Math.min(over, HITSTUN_DECAY_MAX);
+  const floor = Math.ceil((baseStun * HITSTUN_DECAY_FLOOR) / 100);
+  return Math.max(floor, baseStun - cut);
 }
 
 /** ダメージ補正。コンボの段数が進むほど減っていく。 */
@@ -571,6 +589,12 @@ function updateFighter(s: MatchState, side: number, chars: [CharacterDef, Charac
 
   // 物理。
   const airborne = f.y > 0 || f.state === 'air';
+  // 押し戻しは、移動やジャンプとは別に、常に効く。
+  f.x += f.pushVx;
+  if (f.pushVx !== 0) {
+    const decel = px(0.34);
+    f.pushVx = f.pushVx > 0 ? Math.max(0, f.pushVx - decel) : Math.min(0, f.pushVx + decel);
+  }
   if (airborne) {
     applyGravity(f, char);
     f.y += f.vy;
@@ -591,7 +615,8 @@ function updateFighter(s: MatchState, side: number, chars: [CharacterDef, Charac
     }
   } else {
     f.x += f.vx;
-    // 地上の速度は減衰させる（のけぞりの押し出しなど）。
+    // 地上の速度。のけぞりの押し出しは pushVx が担当するので、
+    // ここでは残っている慣性を消すだけでよい。
     if (f.state === 'hitstun' || f.state === 'blockstun') {
       const decel = px(0.32);
       if (f.vx > 0) f.vx = Math.max(0, f.vx - decel);
@@ -796,6 +821,10 @@ function applyHit(
   const defChar = chars[defender.side];
   const blocked = isBlocking(defender, props);
 
+  // 空中の相手を打ち上げ続けられる回数には上限を設ける。
+  // 上限に達したら、その相手には当たらない（すり抜ける）。
+  if (defender.y > 0 && defender.juggle >= JUGGLE_LIMIT && !blocked) return;
+
   // アーマー。のけぞらずに耐える。
   if (!blocked && defender.state === 'attack') {
     const dm = currentMove(defender, defChar);
@@ -832,7 +861,8 @@ function applyHit(
     defender.guarding = true;
     defender.guardLow = holdingDown(defender);
     defender.stance = defender.guardLow ? 'crouch' : 'stand';
-    defender.vx = defender.facingRight ? -props.pushbackBlock : props.pushbackBlock;
+    defender.pushVx = defender.facingRight ? -props.pushbackBlock : props.pushbackBlock;
+    applyCornerPushback(s, attacker, defender, props.pushbackBlock, props);
     const chipKills = (source?.meterCost ?? 0) >= METER_PER_BAR;
     if (props.chip > 0) applyDamage(s, defender, props.chip, chipKills);
     if (defender.health <= 0) {
@@ -881,7 +911,10 @@ function applyHit(
   const finisher = defender.health <= 0;
   const knock = finisher ? 'launch' : props.knockdown;
   const baseStun = source ? hitstunOf(source) : props.hitAdvantage;
-  const stun = Math.max(1, baseStun + (counter ? props.counterBonus : 0));
+  const stun = Math.max(
+    1,
+    hitstunDecay(baseStun, attacker.comboHits) + (counter ? props.counterBonus : 0),
+  );
 
   defender.state = 'hitstun';
   defender.stateFrame = 0;
@@ -897,7 +930,9 @@ function applyHit(
   if (airborne || knock === 'launch' || knock === 'hard' || knock === 'soft') {
     // 浮かせる。空中では体重ぶん飛びにくい。
     const w = chars[defender.side].weight;
-    const boost = finisher ? 150 : 100;
+    // 打ち上げは回数を重ねるほど低くなる（何度も浮かせ直せないようにする）。
+    const juggleFade = finisher ? 100 : Math.max(45, 100 - defender.juggle * 16);
+    const boost = finisher ? 150 : juggleFade;
     const lx = Math.round((Math.max(props.launchX, finisher ? px(3.2) : 0) * boost) / w);
     const ly = Math.round((Math.max(props.launchY, finisher ? px(5.6) : 0) * boost) / w);
     defender.vx = defender.facingRight ? -lx : lx;
@@ -908,7 +943,8 @@ function applyHit(
     defender.y = Math.max(defender.y, 1);
   } else {
     defender.stateDuration = stun;
-    defender.vx = defender.facingRight ? -props.pushbackHit : props.pushbackHit;
+    defender.pushVx = defender.facingRight ? -props.pushbackHit : props.pushbackHit;
+    applyCornerPushback(s, attacker, defender, props.pushbackHit, props);
     defender.stance = holdingDown(defender) ? 'crouch' : 'stand';
   }
 
@@ -922,6 +958,29 @@ function applyHit(
     combo: attacker.comboHits,
     damage: dmg,
   });
+}
+
+/**
+ * 画面端での押し戻し。
+ *
+ * 相手が壁に張りついていると、いくら殴っても距離が変わりません。
+ * それだと同じ技が永久につながってしまうので、
+ * 実際の格闘ゲームと同じく、**下がれないぶんは殴っているほうが下がります**。
+ * これがあるおかげで、画面端のコンボは自然に終わります。
+ */
+function applyCornerPushback(
+  s: MatchState,
+  attacker: Fighter,
+  defender: Fighter,
+  amount: number,
+  props: HitProps,
+): void {
+  const atWall = Math.abs(toPx(defender.x)) >= STAGE_HALF - 52;
+  if (!atWall) return;
+  const back = attacker.facingRight ? -1 : 1;
+  const self = props.selfPushback > 0 ? props.selfPushback : amount;
+  attacker.pushVx = back * self;
+  void s;
 }
 
 function resolveStrikes(s: MatchState, chars: [CharacterDef, CharacterDef]): void {
@@ -1328,6 +1387,11 @@ export function stepMatch(
       if (f.hitstop > 0) {
         f.hitstop--;
         continue;
+      }
+      f.x += f.pushVx;
+      if (f.pushVx !== 0) {
+        const d = px(0.34);
+        f.pushVx = f.pushVx > 0 ? Math.max(0, f.pushVx - d) : Math.min(0, f.pushVx + d);
       }
       if (f.y > 0) {
         applyGravity(f, chars[i]);

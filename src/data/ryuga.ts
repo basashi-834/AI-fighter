@@ -36,7 +36,7 @@ const specials: MoveDef[] = [
     input: { motion: '236', button: 'HP', stances: ['stand', 'crouch'] },
     startup: 13,
     active: 3,
-    recovery: 32,
+    recovery: 36,
     hitboxes: [],
     hit: fireballHit,
     cancels: [superCancel(13, 20)],
@@ -89,9 +89,11 @@ const specials: MoveDef[] = [
     name: 'Shoryu',
     nameJa: '昇龍拳',
     input: { motion: '623', button: 'HP', stances: ['stand', 'crouch'] },
-    startup: 3,
+    // スト 6 の昇龍拳（弱）に合わせて、発生 5F・出がかり無敵・
+    // ガードされると -32F（＝ほぼ何でも確定する）。
+    startup: 5,
     active: 14,
-    recovery: 26,
+    recovery: 30,
     hitboxes: [{ x: -6, y: 40, w: 46, h: 76 }],
     hurtboxes: [
       { x: -14, y: 0, w: 30, h: 46 },
@@ -99,9 +101,9 @@ const specials: MoveDef[] = [
       { x: -10, y: 92, w: 24, h: 22 },
     ],
     hit: hit({
-      damage: 130,
+      damage: 120,
       hitAdvantage: 0,
-      blockAdvantage: -28,
+      blockAdvantage: -32,
       knockdown: 'launch',
       launchX: px(2.2),
       launchY: px(9.4),
@@ -115,8 +117,8 @@ const specials: MoveDef[] = [
       counterBonus: 10,
     }),
     cancels: [superCancel(3, 8)],
-    invuln: [{ from: 1, to: 6, kind: 'full' }],
-    airborne: { from: 4, to: 'landing' },
+    invuln: [{ from: 1, to: 8, kind: 'full' }],
+    airborne: { from: 5, to: 'landing' },
     velocity: [
       { frame: 1, vx: px(2.2), vy: px(11.6) },
       { frame: 8, vx: px(0.6), vy: 0, add: true },
@@ -131,9 +133,9 @@ const specials: MoveDef[] = [
     name: 'EX Shoryu',
     nameJa: 'EX 昇龍拳',
     input: { motion: '623', stances: ['stand', 'crouch'], buttons: ['LP', 'MP'] },
-    startup: 3,
+    startup: 5,
     active: 16,
-    recovery: 24,
+    recovery: 28,
     meterCost: 500,
     hitboxes: [{ x: -8, y: 36, w: 52, h: 84 }],
     hurtboxes: [
@@ -142,9 +144,9 @@ const specials: MoveDef[] = [
       { x: -10, y: 92, w: 24, h: 22 },
     ],
     hit: hit({
-      damage: 170,
+      damage: 160,
       hitAdvantage: 0,
-      blockAdvantage: -26,
+      blockAdvantage: -30,
       knockdown: 'launch',
       launchX: px(2.6),
       launchY: px(10.6),
@@ -173,18 +175,18 @@ const specials: MoveDef[] = [
     name: 'Tatsu',
     nameJa: '竜巻旋風脚',
     input: { motion: '214', button: 'HK', stances: ['stand', 'crouch'] },
-    startup: 9,
+    startup: 11,
     active: 12,
-    recovery: 20,
+    recovery: 22,
     hitboxes: [{ x: -20, y: 16, w: 66, h: 58 }],
     hurtboxes: [
       { x: -16, y: 14, w: 34, h: 40 },
       { x: -12, y: 54, w: 26, h: 26 },
     ],
     hit: hit({
-      damage: 100,
+      damage: 80,
       hitAdvantage: 4,
-      blockAdvantage: -6,
+      blockAdvantage: -10,
       knockdown: 'soft',
       launchX: px(3.4),
       launchY: px(5.4),
@@ -217,7 +219,7 @@ const specials: MoveDef[] = [
     meterCost: 1000,
     superFreeze: 46,
     hitboxes: [],
-    hit: hit({ damage: 300, hitAdvantage: 30, blockAdvantage: 22 }),
+    hit: hit({ damage: 220, hitAdvantage: 30, blockAdvantage: 22 }),
     cancels: [],
     invuln: [{ from: 1, to: 10, kind: 'full' }],
     projectile: {
@@ -229,8 +231,8 @@ const specials: MoveDef[] = [
       life: 150,
       power: 10,
       hit: hit({
-        damage: 300,
-        chip: 55,
+        damage: 220,
+        chip: 40,
         hitAdvantage: 34,
         blockAdvantage: 24,
         hitstop: 16,
@@ -286,11 +288,38 @@ export const RYUGA: CharacterDef = {
   moves: [
     ...buildNormals(
       { reach: 1, power: 1 },
+      // ---- スト 6 のリュウのフレームデータに合わせた数値 ----
+      //
+      // ダメージはスト 6 が体力 10000 に対してこのゲームは 1000 なので、
+      // すべて 1/10 にしてあります（例：スト 6 の 5LP は 300 → 30）。
+      //
+      // 補足：スト 6 の 5LP は「ヒット +4F / 発生 4F」なので、
+      // 理屈のうえでは自分自身につながり続けます。このゲームでは
+      // のけぞりの減衰と画面端の押し戻しで自然に止まるようにしてあります
+      // （tests/combo.test.ts で検証）。
       {
-        // 立ち中キックはリュウガの主力の牽制。少し長い。
-        '5mk': { f: [8, 4, 14], boxes: [[12, 32, 66, 24]], damage: 70, adv: [3, -3] },
-        // しゃがみ中キックから必殺技へつなげるのが基本コンボ。
-        '2mk': { damage: 60, adv: [3, -2], cancels: [specialCancel(8, 14), superCancel(8, 14)] },
+        '5lp': { f: [4, 3, 9], adv: [4, -1], damage: 30 },
+        '5mp': { f: [6, 4, 11], adv: [7, -1], damage: 60 },
+        '5hp': { f: [9, 3, 20], adv: [3, -3], damage: 80, boxes: [[10, 50, 64, 28]] },
+        '5lk': { f: [5, 3, 8], adv: [4, -1], damage: 30 },
+        '5mk': { f: [7, 3, 15], adv: [3, -3], damage: 60, boxes: [[12, 32, 66, 24]],
+                 hurt: [[-14, 0, 30, 38], [-16, 38, 34, 38], [-12, 76, 26, 26], [16, 30, 38, 18]] },
+        '5hk': { f: [12, 4, 16], adv: [5, 1], damage: 90 },
+        '2lp': { f: [4, 2, 9], adv: [4, -1], damage: 30 },
+        '2mp': { f: [6, 3, 12], adv: [5, -1], damage: 50 },
+        // 対空。スト 6 では当たるとダウンを奪う。
+        '2hp': { f: [8, 4, 22], adv: [12, -6], damage: 80 },
+        '2lk': { f: [5, 3, 9], adv: [2, -3], damage: 20 },
+        '2mk': { f: [8, 4, 15], adv: [2, -4], damage: 50,
+                 cancels: [specialCancel(8, 15), superCancel(8, 15)] },
+        // 足払い。スト 6 でも -12F で、ガードされるとほぼ確定反撃。
+        '2hk': { f: [9, 4, 24], adv: [20, -12], damage: 90 },
+        'jlp': { f: [5, 6, 8], adv: [6, 3], damage: 30 },
+        'jmp': { f: [6, 6, 10], adv: [6, 3], damage: 60 },
+        'jhp': { f: [8, 5, 12], adv: [7, 4], damage: 80 },
+        'jlk': { f: [5, 6, 8], adv: [6, 3], damage: 30 },
+        'jmk': { f: [7, 8, 10], adv: [6, 3], damage: 60 },
+        'jhk': { f: [9, 5, 14], adv: [7, 4], damage: 90 },
       },
     ),
     makeThrow('throw', '当て身投げ', 130, 52),

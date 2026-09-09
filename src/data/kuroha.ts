@@ -17,7 +17,7 @@ import { buildNormals, makeThrow } from './kit';
 
 /** 衝撃波（弾のヒット性能）。source が無いので、そのままの硬直フレーム。 */
 const boomHit = hit({
-  damage: 55,
+  damage: 50,
   chip: 10,
   hitAdvantage: 20,
   blockAdvantage: 14,
@@ -38,9 +38,9 @@ const specials: MoveDef[] = [
     name: 'Shock Wave',
     nameJa: '衝撃波',
     input: { motion: 'charge_back', button: 'HP', stances: ['stand', 'crouch'] },
-    startup: 11,
+    startup: 12,
     active: 3,
-    recovery: 24,
+    recovery: 26,
     hitboxes: [],
     hit: boomHit,
     cancels: [superCancel(11, 18)],
@@ -93,9 +93,9 @@ const specials: MoveDef[] = [
     name: 'Flash Kick',
     nameJa: '空裂脚',
     input: { motion: 'charge_down', button: 'HK', stances: ['stand', 'crouch'] },
-    startup: 4,
+    startup: 5,
     active: 12,
-    recovery: 26,
+    recovery: 32,
     hitboxes: [{ x: -10, y: 40, w: 44, h: 76 }],
     hurtboxes: [
       { x: -13, y: 0, w: 28, h: 48 },
@@ -103,9 +103,9 @@ const specials: MoveDef[] = [
       { x: -10, y: 92, w: 22, h: 20 },
     ],
     hit: hit({
-      damage: 125,
+      damage: 110,
       hitAdvantage: 0,
-      blockAdvantage: -26,
+      blockAdvantage: -36,
       knockdown: 'launch',
       launchX: px(2.6),
       launchY: px(9.2),
@@ -117,7 +117,7 @@ const specials: MoveDef[] = [
       meterGainDefender: 45,
     }),
     cancels: [superCancel(4, 10)],
-    invuln: [{ from: 1, to: 6, kind: 'full' }],
+    invuln: [{ from: 1, to: 8, kind: 'full' }],
     airborne: { from: 5, to: 'landing' },
     velocity: [{ frame: 1, vx: px(1.2), vy: px(11.4) }],
     landingRecovery: 20,
@@ -175,7 +175,7 @@ const specials: MoveDef[] = [
     meterCost: 1000,
     superFreeze: 44,
     hitboxes: [],
-    hit: hit({ damage: 290, hitAdvantage: 30, blockAdvantage: 22 }),
+    hit: hit({ damage: 210, hitAdvantage: 30, blockAdvantage: 22 }),
     cancels: [],
     invuln: [{ from: 1, to: 9, kind: 'full' }],
     projectile: {
@@ -187,8 +187,8 @@ const specials: MoveDef[] = [
       life: 140,
       power: 10,
       hit: hit({
-        damage: 290,
-        chip: 50,
+        damage: 210,
+        chip: 38,
         hitAdvantage: 34,
         blockAdvantage: 24,
         hitstop: 16,
@@ -243,14 +243,34 @@ export const KUROHA: CharacterDef = {
   ai: { aggression: 45, defense: 78, zoning: 85, execution: 80 },
   moves: [
     ...buildNormals(
-      { reach: 1.12, power: 0.96, startupDelta: 1, build: 1.02 },
+      { reach: 1.12, power: 1, build: 1.02 },
+      // ---- スト 6 のガイルのフレームデータを参考にした数値 ----
+      //
+      // ガイルの持ち味である「リーチの長い通常技」「発生は遅いが判定が強い」
+      // 「ため技で守りながら攻める」を数値に落としています。
+      // ダメージはスト 6 の 1/10（体力 10000 → 1000）。
       {
-        // リーチの長い技が持ち味。そのぶん発生は遅い。
-        '5mk': { f: [9, 4, 15], damage: 62, adv: [3, -3], boxes: [[12, 32, 74, 24]] },
-        '5hk': { f: [13, 4, 21], damage: 92, adv: [8, -9], boxes: [[10, 38, 80, 30]] },
-        '2mk': { f: [9, 4, 15], damage: 58, adv: [2, -3], boxes: [[12, 4, 72, 20]] },
-        // しゃがみ強パンチは対空だが、無敵は無い（対空はため技の役目）。
-        '2hp': { f: [9, 5, 20], damage: 80, adv: [10, -10], boxes: [[4, 46, 44, 56]] },
+        '5lp': { f: [4, 3, 8], adv: [4, -1], damage: 30 },
+        '5mp': { f: [6, 3, 12], adv: [5, -1], damage: 50 },
+        '5hp': { f: [9, 3, 19], adv: [4, -2], damage: 70 },
+        '5lk': { f: [5, 3, 8], adv: [3, -2], damage: 30 },
+        // 立ち中K：リーチが長い。差し合いの主役。
+        '5mk': { f: [8, 4, 16], adv: [2, -4], damage: 60, boxes: [[12, 32, 76, 24]] },
+        '5hk': { f: [11, 4, 20], adv: [5, -4], damage: 80, boxes: [[10, 38, 82, 30]] },
+        '2lp': { f: [4, 3, 8], adv: [4, -1], damage: 30 },
+        '2mp': { f: [6, 3, 13], adv: [4, -2], damage: 50 },
+        // 対空。ため技のほうが本命なので、こちらに無敵は無い。
+        '2hp': { f: [9, 4, 21], adv: [10, -8], damage: 70, boxes: [[4, 46, 44, 56]] },
+        '2lk': { f: [5, 3, 9], adv: [2, -3], damage: 20 },
+        // しゃがみ中K：ガイルといえばこれ。とにかく長い。
+        '2mk': { f: [8, 4, 17], adv: [1, -5], damage: 50, boxes: [[12, 4, 78, 20]] },
+        '2hk': { f: [10, 4, 24], adv: [20, -12], damage: 80 },
+        'jlp': { f: [5, 6, 8], adv: [6, 3], damage: 30 },
+        'jmp': { f: [6, 6, 10], adv: [6, 3], damage: 50 },
+        'jhp': { f: [8, 5, 12], adv: [7, 4], damage: 70 },
+        'jlk': { f: [5, 6, 8], adv: [6, 3], damage: 30 },
+        'jmk': { f: [7, 8, 10], adv: [6, 3], damage: 55 },
+        'jhk': { f: [9, 5, 14], adv: [7, 4], damage: 80 },
       },
     ),
     makeThrow('throw', '首折り投げ', 125, 52),

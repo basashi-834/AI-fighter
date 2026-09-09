@@ -17,18 +17,18 @@ const specials: MoveDef[] = [
     name: 'Sonic Rush',
     nameJa: '疾風脚',
     input: { motion: '236', button: 'HK', stances: ['stand', 'crouch'] },
-    startup: 11,
+    startup: 12,
     active: 6,
-    recovery: 22,
+    recovery: 24,
     hitboxes: [{ x: 6, y: 18, w: 62, h: 42 }],
     hurtboxes: [
       { x: -14, y: 8, w: 30, h: 34 },
       { x: -10, y: 42, w: 24, h: 24 },
     ],
     hit: hit({
-      damage: 95,
+      damage: 80,
       hitAdvantage: 3,
-      blockAdvantage: -7,
+      blockAdvantage: -6,
       knockdown: 'none',
       hitstop: 10,
       guardstop: 8,
@@ -94,9 +94,9 @@ const specials: MoveDef[] = [
     name: 'Rising Talon',
     nameJa: '昇り蹴り',
     input: { motion: '623', button: 'HK', stances: ['stand', 'crouch'] },
-    startup: 4,
+    startup: 5,
     active: 12,
-    recovery: 24,
+    recovery: 30,
     hitboxes: [{ x: -4, y: 44, w: 42, h: 70 }],
     hurtboxes: [
       { x: -13, y: 0, w: 28, h: 48 },
@@ -104,9 +104,9 @@ const specials: MoveDef[] = [
       { x: -10, y: 92, w: 22, h: 20 },
     ],
     hit: hit({
-      damage: 115,
+      damage: 110,
       hitAdvantage: 0,
-      blockAdvantage: -25,
+      blockAdvantage: -34,
       knockdown: 'launch',
       launchX: px(2.4),
       launchY: px(9.0),
@@ -118,7 +118,7 @@ const specials: MoveDef[] = [
       meterGainDefender: 40,
     }),
     cancels: [superCancel(4, 10)],
-    invuln: [{ from: 1, to: 5, kind: 'full' }],
+    invuln: [{ from: 1, to: 8, kind: 'full' }],
     airborne: { from: 5, to: 'landing' },
     velocity: [{ frame: 1, vx: px(1.8), vy: px(11.2) }],
     landingRecovery: 18,
@@ -131,14 +131,14 @@ const specials: MoveDef[] = [
     name: 'Falcon Dive',
     nameJa: '空中落とし蹴り',
     input: { motion: '214', button: 'HK', stances: ['air'] },
-    startup: 5,
+    startup: 6,
     active: 24,
     recovery: 4,
     air: true,
     onceInAir: true,
     hitboxes: [{ x: 2, y: -6, w: 44, h: 40 }],
     hit: hit({
-      damage: 80,
+      damage: 60,
       hitAdvantage: 12,
       blockAdvantage: 2,
       knockdown: 'none',
@@ -176,7 +176,7 @@ const specials: MoveDef[] = [
       { x: -10, y: 46, w: 22, h: 24 },
     ],
     hit: hit({
-      damage: 46,
+      damage: 34,
       hitAdvantage: 10,
       blockAdvantage: -1,
       knockdown: 'none',
@@ -233,16 +233,36 @@ export const SAYA: CharacterDef = {
   ai: { aggression: 82, defense: 40, zoning: 20, execution: 78 },
   moves: [
     ...buildNormals(
-      { reach: 0.94, power: 0.88, startupDelta: -1, recoveryDelta: -1, build: 0.94 },
+      { reach: 0.94, power: 1, build: 0.94 },
+      // ---- スト 6 のキャミィのフレームデータを参考にした数値 ----
+      //
+      // ダメージはスト 6 が体力 10000、このゲームが 1000 なので 1/10。
+      // キャミィの持ち味である「4F の下段」「発生の速い中パンチ」
+      // 「立ち中K・足払いは必殺技キャンセル不可で、ガードされると危ない」を
+      // そのまま持ってきています。
       {
-        // 立ち弱パンチは全キャラ最速の 3F。暴れと確定反撃の要。
-        '5lp': { f: [3, 3, 6], damage: 25, adv: [5, 2], boxes: [[12, 54, 36, 16]] },
-        // しゃがみ弱キックが 4F の下段。ここからチェーンで押し込む。
-        '2lk': { f: [4, 3, 7], damage: 22, adv: [4, 1], boxes: [[13, 6, 40, 14]] },
-        // 立ち中キックは長め。差し合いの主軸。
-        '5mk': { f: [7, 4, 12], damage: 58, adv: [4, -1], boxes: [[12, 30, 62, 22]] },
-        // ジャンプ中キックは判定が下に強い。飛び込みの本命。
-        'jmk': { f: [6, 10, 8], damage: 58, adv: [7, 4], boxes: [[8, -4, 48, 36]] },
+        '5lp': { f: [4, 3, 8], adv: [4, -1], damage: 30, boxes: [[12, 54, 36, 16]] },
+        '5mp': { f: [5, 3, 12], adv: [5, -2], damage: 50 },
+        '5hp': { f: [8, 3, 18], adv: [4, -2], damage: 70 },
+        '5lk': { f: [4, 3, 8], adv: [3, -2], damage: 30 },
+        // 立ち中K：長いがガードされると危ない。必殺技でキャンセルできない。
+        '5mk': { f: [8, 3, 17], adv: [2, -6], damage: 60, boxes: [[12, 30, 64, 22]],
+                 cancels: [superCancel(8, 12)] },
+        '5hk': { f: [10, 3, 20], adv: [8, -9], damage: 80, cancels: [superCancel(10, 14)] },
+        '2lp': { f: [4, 3, 8], adv: [4, -1], damage: 30 },
+        '2mp': { f: [6, 3, 12], adv: [5, -1], damage: 50 },
+        '2hp': { f: [9, 4, 20], adv: [11, -5], damage: 70 },
+        // しゃがみ弱K：4F の下段。ここから刻むのがキャミィの基本。
+        '2lk': { f: [4, 3, 9], adv: [2, -2], damage: 20, boxes: [[13, 6, 40, 14]] },
+        '2mk': { f: [7, 3, 16], adv: [1, -5], damage: 50 },
+        // 足払い：キャンセル不可。当てにいくときは覚悟がいる。
+        '2hk': { f: [8, 4, 24], adv: [20, -11], damage: 80 },
+        'jlp': { f: [4, 6, 8], adv: [6, 3], damage: 30 },
+        'jmp': { f: [6, 6, 10], adv: [6, 3], damage: 50 },
+        'jhp': { f: [8, 5, 12], adv: [7, 4], damage: 70 },
+        'jlk': { f: [4, 6, 8], adv: [6, 3], damage: 30 },
+        'jmk': { f: [6, 10, 8], adv: [7, 4], damage: 55, boxes: [[8, -4, 48, 36]] },
+        'jhk': { f: [8, 5, 14], adv: [7, 4], damage: 80 },
       },
     ),
     makeThrow('throw', '巴投げ', 115, 50),
