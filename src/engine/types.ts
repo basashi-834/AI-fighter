@@ -283,7 +283,24 @@ export interface Appearance {
   build: number;
   /** 髪型。 */
   hairStyle: 'short' | 'long' | 'spiky' | 'bun' | 'bald' | 'ponytail';
+  /** 肌の陰の色。省略時は肌色から自動で作る。 */
+  skinDark?: string;
+  /** 身につけているもの。描画のときに追加で描く。 */
+  gear?: Gear[];
+  /** 顔立ち。 */
+  face?: 'stern' | 'sharp' | 'calm' | 'fierce';
 }
+
+/** 装備品。キャラクターの見分けをつけるための描き足し。 */
+export type Gear =
+  | 'headband'      // 鉢巻き（後ろに垂れる）
+  | 'gloves'        // 手甲
+  | 'boots'         // ブーツ
+  | 'barefoot'      // 裸足
+  | 'shoulderpads'  // 肩当て
+  | 'wristwraps'    // 手首の巻き布
+  | 'openJacket'    // 前を開けた上着
+  | 'sash';         // たすき
 
 export interface CharacterDef {
   id: string;

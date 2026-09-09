@@ -208,6 +208,9 @@ export const GOUZAN: CharacterDef = {
     accent: '#d8b44a',
     build: 1.12,
     hairStyle: 'bald',
+    face: 'fierce',
+    // 前を開けた上着で胸を出し、ブーツと手首の巻き布。
+    gear: ['openJacket', 'boots', 'wristwraps'],
   },
   ai: { aggression: 72, defense: 45, zoning: 10, execution: 65 },
   moves: [

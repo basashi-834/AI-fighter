@@ -234,7 +234,7 @@ function drawCharInfo(
   const stats: [string, number][] = [
     ['体力', c.health / 1200],
     ['速さ', c.walkForward / px(2.2)],
-    ['威力', c.moves.reduce((a, m) => Math.max(a, m.hit.damage), 0) / 360],
+    ['威力', c.moves.reduce((a, m) => Math.max(a, m.hit.damage), 0) / 240],
   ];
   stats.forEach(([label, v], i) => {
     const by = y + 26 + i * 8;

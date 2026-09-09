@@ -283,6 +283,9 @@ export const RYUGA: CharacterDef = {
     accent: '#b8352f',
     build: 1,
     hairStyle: 'short',
+    face: 'stern',
+    // 鉢巻きと裸足、手首の巻き布。道着はきっちり着る。
+    gear: ['headband', 'barefoot', 'wristwraps'],
   },
   ai: { aggression: 55, defense: 60, zoning: 60, execution: 70 },
   moves: [

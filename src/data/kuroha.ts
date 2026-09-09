@@ -239,6 +239,9 @@ export const KUROHA: CharacterDef = {
     accent: '#d8d24a',
     build: 1.02,
     hairStyle: 'spiky',
+    face: 'calm',
+    // 肩当てとブーツ、たすき掛け。軍装めいた見た目。
+    gear: ['shoulderpads', 'boots', 'sash'],
   },
   ai: { aggression: 45, defense: 78, zoning: 85, execution: 80 },
   moves: [

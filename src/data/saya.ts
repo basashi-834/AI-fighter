@@ -229,6 +229,9 @@ export const SAYA: CharacterDef = {
     accent: '#5ad0d8',
     build: 0.94,
     hairStyle: 'ponytail',
+    face: 'sharp',
+    // 手甲とブーツ。動きやすさ優先の装い。
+    gear: ['gloves', 'boots'],
   },
   ai: { aggression: 82, defense: 40, zoning: 20, execution: 78 },
   moves: [
