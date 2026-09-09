@@ -63,8 +63,6 @@ export class Renderer {
         this.effects.dustAt(toPx(s.fighters[e.side].x), e.hard ? 9 : 4);
       } else if (e.type === 'dash') {
         this.effects.dustAt(toPx(s.fighters[e.side].x), 6);
-      } else if (e.type === 'ko') {
-        this.showBanner('K.O.', '', 120);
       } else if (e.type === 'roundStart') {
         this.hud.reset();
       }

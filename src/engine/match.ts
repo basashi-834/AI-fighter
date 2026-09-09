@@ -499,6 +499,9 @@ function updateFighter(s: MatchState, side: number, chars: [CharacterDef, Charac
       break;
 
     case 'knockdown':
+      // 受け身：ダウン中に下を入れておくと、少し早く起き上がれる。
+      // ただし早く起きたぶん、無敵時間も短い。
+      if (holdingDown(f) && f.stateDuration > 18) f.stateDuration -= 1;
       if (f.stateFrame >= f.stateDuration) {
         f.state = 'wakeup';
         f.stateFrame = 0;
@@ -828,6 +831,15 @@ function applyHit(
     defender.vx = defender.facingRight ? -props.pushbackBlock : props.pushbackBlock;
     const chipKills = (source?.meterCost ?? 0) >= METER_PER_BAR;
     if (props.chip > 0) applyDamage(s, defender, props.chip, chipKills);
+    if (defender.health <= 0) {
+      // 削り殺しでもきちんと吹き飛ばす。
+      defender.state = 'hitstun';
+      defender.stateFrame = 0;
+      defender.stateDuration = 999;
+      defender.vx = defender.facingRight ? -px(3) : px(3);
+      defender.vy = px(5.4);
+      defender.y = 1;
+    }
     addMeter(attacker, Math.round(props.meterGainAttacker / 2));
     addMeter(defender, Math.round(props.meterGainDefender / 2));
     emit(s, { type: 'block', side: defender.side, x: point.x, y: point.y, props, low: defender.guardLow });
@@ -860,7 +872,10 @@ function applyHit(
   addMeter(defender, props.meterGainDefender);
 
   const airborne = defender.y > 0;
-  const knock = props.knockdown;
+  // 倒しきった一撃は、技の性質にかかわらず必ず吹き飛ばす。
+  // 立ったまま negative になって終わるのは、決着として気持ちよくない。
+  const finisher = defender.health <= 0;
+  const knock = finisher ? 'launch' : props.knockdown;
   const baseStun = source ? hitstunOf(source) : props.hitAdvantage;
   const stun = Math.max(1, baseStun + (counter ? props.counterBonus : 0));
 
@@ -870,11 +885,17 @@ function applyHit(
   defender.moveFrame = 0;
   defender.guarding = false;
 
+  if (finisher) {
+    attacker.hitstop = Math.max(attacker.hitstop, 18);
+    defender.hitstop = Math.max(defender.hitstop, 18);
+  }
+
   if (airborne || knock === 'launch' || knock === 'hard' || knock === 'soft') {
     // 浮かせる。空中では体重ぶん飛びにくい。
     const w = chars[defender.side].weight;
-    const lx = Math.round((props.launchX * 100) / w);
-    const ly = Math.round((props.launchY * 100) / w);
+    const boost = finisher ? 150 : 100;
+    const lx = Math.round((Math.max(props.launchX, finisher ? px(3.2) : 0) * boost) / w);
+    const ly = Math.round((Math.max(props.launchY, finisher ? px(5.6) : 0) * boost) / w);
     defender.vx = defender.facingRight ? -lx : lx;
     defender.vy = airborne ? Math.max(ly, px(3)) : ly;
     if (defender.vy <= 0) defender.vy = px(3);
@@ -1152,9 +1173,12 @@ function enforceSeparation(s: MatchState, chars: [CharacterDef, CharacterDef]): 
 function updateCamera(s: MatchState): void {
   const mid = Math.round((toPx(s.fighters[0].x) + toPx(s.fighters[1].x)) / 2);
   const half = Math.round(VIEW_W / 2);
+  // 壁ぎわで少しだけ外を見せる。こうしないと、端に押し込まれた側の
+  // 腕や足が画面の外に切れてしまい、何をされているのか見えなくなる。
+  const margin = 26;
   let target = mid;
-  if (target < -STAGE_HALF + half) target = -STAGE_HALF + half;
-  if (target > STAGE_HALF - half) target = STAGE_HALF - half;
+  if (target < -STAGE_HALF + half - margin) target = -STAGE_HALF + half - margin;
+  if (target > STAGE_HALF - half + margin) target = STAGE_HALF - half + margin;
   // すこしだけ追従を遅らせる（整数のまま）。
   const diff = target - s.cameraX;
   if (diff !== 0) {
@@ -1322,6 +1346,16 @@ export function stepMatch(
       clampToStage(f, STAGE_HALF, chars[i]);
     }
     updateCamera(s);
+    // 決着から少し経ったら、勝ったほうが勝ちポーズを取る。
+    if (s.phase === 'ko' && s.phaseFrame === 70 && s.roundWinner >= 0) {
+      const w = s.fighters[s.roundWinner];
+      if (w.y === 0 && w.state !== 'knockdown' && w.state !== 'hitstun') {
+        w.state = 'win';
+        w.stateFrame = 0;
+        w.moveIndex = -1;
+      }
+    }
+
     if (s.phase === 'ko' && s.phaseFrame >= ROUND_OUTRO_FRAMES) {
       if (s.matchWinner >= 0 || (s.wins[0] >= s.config.roundsToWin || s.wins[1] >= s.config.roundsToWin)) {
         s.phase = 'matchEnd';

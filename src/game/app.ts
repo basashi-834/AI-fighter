@@ -78,6 +78,7 @@ export class App {
   trainingIndex = 0;
   net: NetSession | null = null;
 
+  private slowCounter = 0;
   private accumulator = 0;
   private lastTime = 0;
   private resultTimer = 0;
@@ -363,18 +364,19 @@ export class App {
     else if (this.vsMode === 'training' && s.config.dummyAction === 'cpu' && this.cpu) p2 = this.cpu.think(s, this.chars);
     else if (this.vsMode === 'training') p2 = this.controls.bits(1);
 
-    // 決着後のスローモーション。
-    const slow = s.slowmo > 0 && s.phase === 'ko';
-    if (slow && s.frame % 3 !== 0) {
-      // 3 フレームに 1 回だけ進める（ゆっくり見せる）。
-      s.frame++;
-      this.renderer.consume(s, this.chars);
-      return;
+    // 決着直後はスローモーションにして、決め手を見せる。
+    // シミュレーションのフレーム番号には手を触れず、「進めない」だけにする。
+    if (s.slowmo > 0 && s.phase === 'ko') {
+      this.slowCounter++;
+      if (this.slowCounter % 3 !== 0) return;
+    } else {
+      this.slowCounter = 0;
     }
 
     stepMatch(s, this.chars, [p1, p2]);
     this.renderer.consume(s, this.chars);
     this.playEventSounds(s);
+    this.showOutcomeBanner(s);
 
     if (!this.introShown && s.phase === 'intro' && s.phaseFrame === 1) this.introShown = true;
 
@@ -548,6 +550,29 @@ export class App {
     this.renderer.effects.clear();
     this.mode = 'fight';
     sound.startMusic('battle');
+  }
+
+  /**
+   * 決着の見出しを出す。
+   * 「K.O.」で終わらせず、無傷なら PERFECT、時間切れなら TIME UP と出し分ける。
+   * 同じ勝ちでも中身が違うことが一目で分かるようにするための演出です。
+   */
+  private showOutcomeBanner(s: MatchState): void {
+    if (!s.events.some((e) => e.type === 'ko')) return;
+    const w = s.roundWinner;
+    if (w < 0) {
+      this.renderer.showBanner('DOUBLE K.O.', '相打ち', 130);
+      return;
+    }
+    const winner = s.fighters[w];
+    const loser = s.fighters[1 - w];
+    if (loser.health > 0) {
+      this.renderer.showBanner('TIME UP', `${this.chars[w].nameJa} の勝ち`, 130);
+    } else if (winner.health >= winner.maxHealth) {
+      this.renderer.showBanner('PERFECT', '一発ももらわず', 140);
+    } else {
+      this.renderer.showBanner('K.O.', '', 120);
+    }
   }
 
   /** イベントに合わせて音を鳴らす。 */
