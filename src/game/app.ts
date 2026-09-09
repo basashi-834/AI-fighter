@@ -60,6 +60,17 @@ export class App {
   /** 対戦の種類。 */
   vsMode: 'cpu' | 'local' | 'training' | 'online' = 'cpu';
 
+  /**
+   * アーケードモードの進行。
+   * 勝つと次の相手が出てくる。ロスター全員を倒せば完走。
+   */
+  arcade: { active: boolean; queue: number[]; index: number; cleared: boolean } = {
+    active: false,
+    queue: [],
+    index: 0,
+    cleared: false,
+  };
+
   settings: Settings = {
     difficulty: 'normal',
     rounds: 2,
@@ -212,7 +223,8 @@ export class App {
   }
 
   readonly titleItems = [
-    { id: 'cpu', label: 'CPU と対戦', sub: 'ARCADE / VS CPU' },
+    { id: 'arcade', label: 'アーケード', sub: '全員抜き' },
+    { id: 'cpu', label: 'CPU と 1 戦', sub: 'VS CPU' },
     { id: 'local', label: '2 人対戦', sub: '1 台のキーボードで' },
     { id: 'training', label: 'トレーニング', sub: '技と判定の確認' },
     { id: 'online', label: 'オンライン対戦', sub: 'ロールバック方式' },
@@ -222,6 +234,7 @@ export class App {
   ];
 
   private updateTitle(): void {
+    sound.startMusic('menu');
     this.menuIndex = this.menuNav(this.titleItems.length, this.menuIndex);
     if (this.confirmPressed()) {
       sound.ensure();
@@ -238,7 +251,8 @@ export class App {
         this.mode = 'online';
         this.net = this.net ?? new NetSession();
       } else {
-        this.vsMode = id as 'cpu' | 'local' | 'training';
+        this.arcade.active = id === 'arcade';
+        this.vsMode = id === 'arcade' ? 'cpu' : (id as 'cpu' | 'local' | 'training');
         this.mode = 'select';
         this.select = { cursor: [0, 1], locked: [false, false], stage: 0 };
       }
@@ -299,8 +313,54 @@ export class App {
     }
 
     if (this.select.locked[0] && this.select.locked[1]) {
+      if (this.arcade.active) this.startArcade();
       this.beginMatch();
     }
+  }
+
+  /**
+   * この試合の CPU の強さ。
+   * アーケードでは勝ち進むほど手強くなる（最後の 1 人はひとつ上の強さ）。
+   */
+  private matchDifficulty(): Difficulty {
+    const order: Difficulty[] = ['easy', 'normal', 'hard', 'expert'];
+    let i = order.indexOf(this.settings.difficulty);
+    if (this.arcade.active) {
+      const last = this.arcade.queue.length - 1;
+      if (this.arcade.index >= last && last > 0) i++;
+      else if (this.arcade.index >= Math.floor(last / 2)) i += 0;
+      else i--;
+    }
+    return order[Math.max(0, Math.min(order.length - 1, i))];
+  }
+
+  /** アーケードの相手表を作る。自分以外を順に、最後にもう一度自分と同キャラ戦。 */
+  private startArcade(): void {
+    const me = this.select.cursor[0];
+    const others = ROSTER.map((_, i) => i).filter((i) => i !== me);
+    // 毎回同じ順番だと飽きるので、開始時刻で並びを変える。
+    const seed = Date.now() & 0xffff;
+    for (let i = others.length - 1; i > 0; i--) {
+      const j = (seed + i * 7919) % (i + 1);
+      [others[i], others[j]] = [others[j], others[i]];
+    }
+    this.arcade.queue = [...others, me];
+    this.arcade.index = 0;
+    this.arcade.cleared = false;
+    this.select.cursor[1] = this.arcade.queue[0];
+  }
+
+  /** アーケードで次の相手へ進む。全員倒していれば true。 */
+  private advanceArcade(): boolean {
+    this.arcade.index++;
+    if (this.arcade.index >= this.arcade.queue.length) {
+      this.arcade.cleared = true;
+      return true;
+    }
+    this.select.cursor[1] = this.arcade.queue[this.arcade.index];
+    // ステージも変える。
+    this.select.stage = (this.select.stage + 1) % STAGES.length;
+    return false;
   }
 
   private updateVersus(): void {
@@ -323,7 +383,7 @@ export class App {
       infiniteMeter: this.vsMode === 'training',
     };
     this.match = createMatch(this.chars, config);
-    this.cpu = this.vsMode === 'cpu' ? new CpuBrain(1, this.settings.difficulty, Date.now() & 0xffff) : null;
+    this.cpu = this.vsMode === 'cpu' ? new CpuBrain(1, this.matchDifficulty(), Date.now() & 0xffff) : null;
     this.cpuP1 = null;
     this.renderer.setStage(STAGES[this.select.stage].id);
     this.renderer.hud.reset();
@@ -396,9 +456,14 @@ export class App {
     if (!this.introShown && s.phase === 'intro' && s.phaseFrame === 1) this.introShown = true;
 
     if (s.phase === 'matchEnd' && s.phaseFrame > 90) {
+      sound.stopMusic();
+      if (this.arcade.active && s.matchWinner === 0 && !this.advanceArcade()) {
+        // 勝ったので次の相手へ。
+        this.beginMatch();
+        return;
+      }
       this.mode = 'result';
       this.resultTimer = 60 * 8;
-      sound.stopMusic();
     }
   }
 
@@ -461,10 +526,14 @@ export class App {
   private updateResult(): void {
     this.resultTimer--;
     if (this.confirmPressed() || this.resultTimer <= 0) {
+      this.arcade.active = false;
       this.mode = 'select';
       this.select.locked = [false, false];
     }
-    if (this.cancelPressed()) this.mode = 'title';
+    if (this.cancelPressed()) {
+      this.arcade.active = false;
+      this.mode = 'title';
+    }
   }
 
   private updateSubScreen(): void {
@@ -684,7 +753,13 @@ export class App {
         drawCharSelect(ctx, this.select, this.vsMode, this.renderer.tick);
         break;
       case 'versus':
-        drawVersus(ctx, this.chars, this.renderer.tick, STAGES[this.select.stage]);
+        drawVersus(
+          ctx,
+          this.chars,
+          this.renderer.tick,
+          STAGES[this.select.stage],
+          this.arcade.active ? { index: this.arcade.index, total: this.arcade.queue.length } : null,
+        );
         break;
       case 'fight':
         if (this.match) {
@@ -700,7 +775,7 @@ export class App {
       case 'result':
         if (this.match) {
           this.renderer.render(ctx, this.match, this.chars);
-          drawResult(ctx, this.match, this.chars, this.renderer.tick);
+          drawResult(ctx, this.match, this.chars, this.renderer.tick, this.arcade);
         }
         break;
       case 'howto':

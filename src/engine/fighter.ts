@@ -221,6 +221,16 @@ export function isAirborne(f: Fighter, char: CharacterDef): boolean {
   return false;
 }
 
+/**
+ * 走り込みながら技を出せる状態か。
+ *
+ * ダッシュ中いっさい何もできないと、前進が「ただの移動」で終わってしまい、
+ * 攻めが単調になります。踏み込んでから技、ができると一気に選択肢が増えます。
+ */
+export function canActFromDash(f: Fighter): boolean {
+  return f.state === 'dash' && f.stateFrame >= 3;
+}
+
 /** 行動できる状態か。 */
 export function isActionable(f: Fighter): boolean {
   switch (f.state) {

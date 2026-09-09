@@ -30,6 +30,7 @@ import {
 import {
   addMeter,
   applyGravity,
+  canActFromDash,
   clampToStage,
   cloneFighter,
   createFighter,
@@ -273,6 +274,7 @@ function canStartMove(f: Fighter, char: CharacterDef, m: MoveDef): boolean {
   if ((m.meterCost ?? 0) > f.meter) return false;
 
   if (isActionable(f)) return true;
+  if (canActFromDash(f)) return true;
   if (f.state === 'air' && m.input.stances.includes('air')) return true;
   if (f.state === 'attack') return canCancelInto(f, char, m);
   return false;
@@ -321,6 +323,8 @@ function movePriority(m: MoveDef): number {
 function startMove(f: Fighter, char: CharacterDef, index: number, s: MatchState): void {
   const m = char.moves[index];
   const cancelled = f.state === 'attack';
+  // 走り込みから出した技は、そこで足を止める（勢いはそのままにしない）。
+  if (f.state === 'dash') f.vx = Math.round(f.vx / 2);
   f.returnStance = f.y > 0 ? 'air' : f.stance;
   f.state = 'attack';
   f.stateFrame = 0;
@@ -560,8 +564,8 @@ function updateFighter(s: MatchState, side: number, chars: [CharacterDef, Charac
       break;
   }
 
-  // 行動できるなら入力を処理する。
-  if (isActionable(f) || f.state === 'air' || f.state === 'attack') {
+  // 行動できるなら入力を処理する。ダッシュ中も技だけは出せる。
+  if (isActionable(f) || f.state === 'air' || f.state === 'attack' || canActFromDash(f)) {
     handleInput(s, f, char);
   }
 

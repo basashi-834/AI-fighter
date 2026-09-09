@@ -34,6 +34,7 @@ export class Sound {
   private noiseBuffer: AudioBuffer | null = null;
   private musicTimer: number | null = null;
   private musicStep = 0;
+  private currentMusic: 'battle' | 'menu' | null = null;
   enabled = true;
   masterVolume = 0.7;
   musicVolume = 0.34;
@@ -198,7 +199,12 @@ export class Sound {
   /** 単純な 4 小節ループ。戦っている最中の緊張感だけ出せればよい。 */
   startMusic(kind: 'battle' | 'menu' = 'battle'): void {
     this.ensure();
-    if (!this.ctx || !this.musicGain || this.musicTimer != null) return;
+    if (!this.ctx || !this.musicGain) return;
+    if (this.musicTimer != null) {
+      if (this.currentMusic === kind) return;
+      this.stopMusic();
+    }
+    this.currentMusic = kind;
     const bass = kind === 'battle'
       ? [55, 55, 65.4, 55, 49, 49, 58.3, 49]
       : [65.4, 0, 82.4, 0, 73.4, 0, 61.7, 0];
@@ -223,6 +229,7 @@ export class Sound {
   }
 
   stopMusic(): void {
+    this.currentMusic = null;
     if (this.musicTimer != null) {
       clearInterval(this.musicTimer);
       this.musicTimer = null;
